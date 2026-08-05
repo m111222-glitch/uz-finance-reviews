@@ -1,0 +1,127 @@
+{
+  "country": "uz",
+  "language": "ru",
+  "category": "finance",
+  "apps": [
+    {
+      "slug": "alif-mobi",
+      "name": "Alif Mobi",
+      "brand": "Alif",
+      "play_id": "tj.alif.mobi",
+      "ios_id": "1331374853",
+      "ios_bundle": "tj.alif.mobi"
+    },
+    {
+      "slug": "payme",
+      "name": "Payme",
+      "brand": "Payme",
+      "play_id": "uz.dida.payme",
+      "ios_id": "1093525667",
+      "ios_bundle": "uz.payme.Payme"
+    },
+    {
+      "slug": "click",
+      "name": "Click SuperApp",
+      "brand": "Click",
+      "play_id": "air.com.ssdsoftwaresolutions.clickuz",
+      "ios_id": "768132591",
+      "ios_bundle": "com.ssdsoftwaresolutions.clickuz"
+    },
+    {
+      "slug": "uzum-bank",
+      "name": "Uzum Bank",
+      "brand": "Uzum",
+      "play_id": "uz.kapitalbank.android",
+      "ios_id": "1492307726",
+      "ios_bundle": "uz.kapitalbank.apelsin"
+    },
+    {
+      "slug": "tbc-uz",
+      "name": "TBC Bank Uzbekistan",
+      "brand": "TBC Bank",
+      "play_id": "ge.space.app.uzbekistan",
+      "ios_id": "1450503714",
+      "ios_bundle": "ge.tbc.tbcuz"
+    },
+    {
+      "slug": "anor-bank",
+      "name": "Anorbank",
+      "brand": "Anor Bank",
+      "play_id": "uz.anormobile.retail",
+      "ios_id": "1579623268",
+      "ios_bundle": "uz.anorbank.mobile"
+    },
+    {
+      "slug": "kapitalbank",
+      "name": "KAPITALBANK Online",
+      "brand": "Kapitalbank",
+      "play_id": "uz.kapitalbank.kbonline",
+      "ios_id": "1546213356",
+      "ios_bundle": "uz.kapitalbank.kbonline"
+    },
+    {
+      "slug": "ipak-yuli",
+      "name": "Ipak Yuli Mobile",
+      "brand": "Ipak Yuli Bank",
+      "play_id": "com.ipakyulibank.mobile",
+      "ios_id": "1436677359",
+      "ios_bundle": "com.tune.ipakyuli"
+    },
+    {
+      "slug": "hamkorbank",
+      "name": "Hamkor",
+      "brand": "Hamkorbank",
+      "play_id": "com.hamkorbank.mobile",
+      "ios_id": "1602323485",
+      "ios_bundle": "com.hamkorbank.mobile"
+    },
+    {
+      "slug": "sqb",
+      "name": "SQB Mobile",
+      "brand": "SQB",
+      "play_id": "com.uzpsb.olam",
+      "ios_id": "1499606946",
+      "ios_bundle": "com.uzpsb.olam"
+    },
+    {
+      "slug": "beepul",
+      "name": "Beepul",
+      "brand": "Beepul",
+      "play_id": "com.olsoft.mats.prod",
+      "ios_id": "1168589903",
+      "ios_bundle": "uz.beeline.beepul"
+    },
+    {
+      "slug": "xazna",
+      "name": "xazna",
+      "brand": "Xazna",
+      "play_id": "uz.tune.xazna",
+      "ios_id": "1642489915",
+      "ios_bundle": "uz.jsc.xalqbank.ios.mobile"
+    },
+    {
+      "slug": "octobank",
+      "name": "Octo-Mobile",
+      "brand": "Octobank",
+      "play_id": "com.ravnaqbank.rbkmobile",
+      "ios_id": "1460141475",
+      "ios_bundle": "com.rbk.RBKMobile"
+    },
+    {
+      "slug": "davr-bank",
+      "name": "Davr Mobile 2.0",
+      "brand": "Davr Bank",
+      "play_id": "uz.davrbank.mobile",
+      "ios_id": "6483247810",
+      "ios_bundle": "uz.idev.app.davrbank.NewDavrMobile"
+    },
+    {
+      "slug": "agrobank",
+      "name": "Agrobank Mobile",
+      "brand": "Agrobank",
+      "play_id": "uz.agrobank.mobile",
+      "ios_id": "1638716474",
+      "ios_bundle": "uz.agrobank.mobile-ios"
+    }
+  ]
+}

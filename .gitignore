@@ -1,0 +1,13 @@
+.env
+data/*.log
+data/*.pid
+data/public_url.txt
+data/permanent_url.txt
+data/screenshots/
+data/server.log
+data/tunnel.log
+__pycache__/
+*.pyc
+.venv/
+*.bak
+.DS_Store

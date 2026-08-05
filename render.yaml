@@ -1,0 +1,19 @@
+# Free permanent host on Render.com (no credit card required for free tier)
+# https://dashboard.render.com/blueprints
+services:
+  - type: web
+    name: uz-finance-reviews
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DASHBOARD_PASSWORD
+        value: ""
+      - key: DASHBOARD_READONLY
+        value: "1"
+      - key: PYTHON_VERSION
+        value: "3.12.0"

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UZ Finance Reviews — Play Store & App Store</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">UZ</div>
+        <div>
+          <div class="brand-title">Finance Reviews</div>
+          <div class="brand-sub">Uzbekistan · Stores</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="overview">Overview</button>
+        <button class="nav-item" data-view="apps">Apps</button>
+        <button class="nav-item" data-view="reviews">Reviews</button>
+        <button class="nav-item" data-view="themes">Themes</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sync-box">
+          <div class="sync-label">Data sync</div>
+          <div id="syncStatus" class="sync-status">—</div>
+          <button id="syncBtn" class="btn btn-primary btn-block">Sync stores</button>
+        </div>
+        <p class="muted tiny">Play Store (UZ) + App Store RSS · finance apps catalog</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">Overview</h1>
+          <p class="muted" id="pageSub">Ratings & reviews for UZ finance category leaders</p>
+        </div>
+        <div class="top-actions">
+          <div class="pill" id="lastSyncPill">Never synced</div>
+        </div>
+      </header>
+
+      <!-- OVERVIEW -->
+      <section id="view-overview" class="view active">
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h3>Rating distribution</h3>
+              <span class="muted tiny">All scraped reviews</span>
+            </div>
+            <canvas id="ratingChart" height="180"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Review volume (90d)</h3>
+              <span class="muted tiny">By review date</span>
+            </div>
+            <canvas id="timelineChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h3>App leaderboard</h3>
+              <span class="muted tiny">Store ratings + scraped sample</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table" id="leaderboardTable">
+                <thead>
+                  <tr>
+                    <th>App</th>
+                    <th>Play ★</th>
+                    <th>iOS ★</th>
+                    <th>Sample</th>
+                    <th>Neg %</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Latest reviews</h3>
+              <span class="muted tiny">Newest first</span>
+            </div>
+            <div id="recentList" class="review-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- APPS -->
+      <section id="view-apps" class="view">
+        <div class="filters">
+          <input id="appSearch" type="search" placeholder="Filter apps…" />
+        </div>
+        <div class="apps-grid" id="appsGrid"></div>
+      </section>
+
+      <!-- REVIEWS -->
+      <section id="view-reviews" class="view">
+        <div class="filters filters-row">
+          <select id="filterApp"><option value="">All apps</option></select>
+          <select id="filterStore">
+            <option value="">All stores</option>
+            <option value="play">Play Store</option>
+            <option value="ios">App Store</option>
+          </select>
+          <select id="filterRating">
+            <option value="">All ratings</option>
+            <option value="5">5 ★</option>
+            <option value="4">4 ★</option>
+            <option value="3">3 ★</option>
+            <option value="2">2 ★</option>
+            <option value="1">1 ★</option>
+          </select>
+          <input id="filterQ" type="search" placeholder="Search text…" />
+          <button id="filterBtn" class="btn btn-secondary">Apply</button>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Reviews</h3>
+            <span class="muted tiny" id="reviewCount">0</span>
+          </div>
+          <div id="reviewsList" class="review-list tall"></div>
+          <div class="pager">
+            <button id="prevPage" class="btn btn-ghost">← Prev</button>
+            <span id="pageInfo" class="muted">Page 1</span>
+            <button id="nextPage" class="btn btn-ghost">Next →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- THEMES -->
+      <section id="view-themes" class="view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h3>Complaint / topic themes</h3>
+              <span class="muted tiny">From recent review sample</span>
+            </div>
+            <canvas id="themesChart" height="220"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Negative themes (1–2★)</h3>
+              <span class="muted tiny">Where users hurt most</span>
+            </div>
+            <canvas id="negThemesChart" height="220"></canvas>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-head"><h3>Top keywords</h3></div>
+            <div id="kwAll" class="chips"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Negative keywords</h3></div>
+            <div id="kwNeg" class="chips"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Positive keywords</h3></div>
+            <div id="kwPos" class="chips"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+:root {
+  --bg: #0b1020;
+  --card: #151f38;
+  --border: rgba(148, 163, 184, 0.14);
+  --text: #e8eefc;
+  --muted: #93a0bd;
+  --primary: #5b8cff;
+  --danger: #ff6b8a;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(900px 500px at 20% -10%, rgba(91, 140, 255, 0.22), transparent 55%),
+    radial-gradient(700px 400px at 100% 10%, rgba(61, 214, 198, 0.12), transparent 50%),
+    var(--bg);
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: linear-gradient(135deg, #5b8cff, #3dd6c6);
+  color: #061018;
+}
+.brand h1 { margin: 0; font-size: 18px; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+.lead {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 18px;
+  line-height: 1.45;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: #0f1730;
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  margin-bottom: 14px;
+}
+input:focus {
+  outline: none;
+  border-color: rgba(91, 140, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.15);
+}
+
+button {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #5b8cff, #7aa2ff);
+  color: #061018;
+}
+button:disabled { opacity: 0.6; cursor: wait; }
+
+.error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.hidden { display: none; }

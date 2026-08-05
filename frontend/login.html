@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in — UZ Finance Reviews</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/login.css" />
+</head>
+<body>
+  <main class="shell">
+    <div class="card">
+      <div class="brand">
+        <div class="mark">UZ</div>
+        <div>
+          <h1>Finance Reviews</h1>
+          <p>Uzbekistan · Play Store &amp; App Store</p>
+        </div>
+      </div>
+      <p class="lead">Enter the share password to open the dashboard.</p>
+      <form id="loginForm">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required autofocus placeholder="••••••••" />
+        <button type="submit" id="submitBtn">Open dashboard</button>
+        <p id="error" class="error hidden"></p>
+      </form>
+    </div>
+  </main>
+  <script src="/assets/login.js"></script>
+</body>
+</html>
