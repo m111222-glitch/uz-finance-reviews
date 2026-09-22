@@ -305,14 +305,59 @@ function renderThemes(d) {
   $("#kwPos").innerHTML = chip(d.keywords_positive, "pos");
 }
 
+const STORE_ID_FIELD = { play: "play_id", ios: "ios_id", huawei: "huawei_id", xiaomi: "xiaomi_id" };
+
+const rating2 = (v) => (v != null ? Number(v).toFixed(2) : "—");
+
+function appMetrics(a, store) {
+  switch (store) {
+    case "play":
+      return [
+        ["Play rating", rating2(a.play_rating)],
+        ["Play ratings #", fmt(a.play_ratings_count, 0), true],
+        ["Installs", escapeHtml(a.play_installs || "—"), true],
+        ["Play reviews", fmt(a.play_review_count, 0), true],
+      ];
+    case "ios":
+      return [
+        ["iOS rating", rating2(a.ios_rating)],
+        ["iOS ratings #", fmt(a.ios_ratings_count, 0), true],
+        ["iOS reviews", fmt(a.ios_review_count, 0), true],
+      ];
+    case "huawei":
+      return [
+        ["Huawei rating", rating2(a.huawei_rating)],
+        ["Huawei reviews", fmt(a.huawei_review_count, 0), true],
+      ];
+    case "xiaomi":
+      return [
+        ["Xiaomi rating", rating2(a.xiaomi_rating)],
+        ["Xiaomi reviews", fmt(a.xiaomi_review_count, 0), true],
+      ];
+    default:
+      return [
+        ["Play rating", rating2(a.play_rating)],
+        ["iOS rating", rating2(a.ios_rating)],
+        ["Play ratings #", fmt(a.play_ratings_count, 0), true],
+        ["iOS ratings #", fmt(a.ios_ratings_count, 0), true],
+        ["Installs", escapeHtml(a.play_installs || "—"), true],
+        ["Scraped reviews", fmt(a.review_count, 0), true],
+      ];
+  }
+}
+
 function renderApps(apps) {
   const q = ($("#appSearch").value || "").toLowerCase();
+  const slug = $("#apApp").value;
+  const store = $("#apStore").value;
   const filtered = apps.filter(
     (a) =>
-      !q ||
-      (a.name || "").toLowerCase().includes(q) ||
-      (a.brand || "").toLowerCase().includes(q) ||
-      (a.slug || "").toLowerCase().includes(q)
+      (!slug || a.slug === slug) &&
+      (!store || a[STORE_ID_FIELD[store]]) &&
+      (!q ||
+        (a.name || "").toLowerCase().includes(q) ||
+        (a.brand || "").toLowerCase().includes(q) ||
+        (a.slug || "").toLowerCase().includes(q))
   );
 
   $("#appsGrid").innerHTML = filtered
@@ -320,6 +365,9 @@ function renderApps(apps) {
       const icon = a.icon_url
         ? `<img class="app-icon" src="${escapeHtml(a.icon_url)}" alt="" />`
         : `<div class="app-icon"></div>`;
+      const metrics = appMetrics(a, store)
+        .map(([k, v, mono]) => `<div class="metric"><div class="k">${k}</div><div class="v${mono ? " mono" : ""}">${v}</div></div>`)
+        .join("");
       return `<article class="app-card">
         <div class="app-card-top">
           ${icon}
@@ -328,28 +376,46 @@ function renderApps(apps) {
             <div class="app-brand">${escapeHtml(a.brand || a.slug)}</div>
           </div>
         </div>
-        <div class="app-metrics">
-          <div class="metric"><div class="k">Play rating</div><div class="v">${a.play_rating != null ? Number(a.play_rating).toFixed(2) : "—"}</div></div>
-          <div class="metric"><div class="k">iOS rating</div><div class="v">${a.ios_rating != null ? Number(a.ios_rating).toFixed(2) : "—"}</div></div>
-          <div class="metric"><div class="k">Play ratings #</div><div class="v mono">${fmt(a.play_ratings_count, 0)}</div></div>
-          <div class="metric"><div class="k">iOS ratings #</div><div class="v mono">${fmt(a.ios_ratings_count, 0)}</div></div>
-          <div class="metric"><div class="k">Installs</div><div class="v mono">${escapeHtml(a.play_installs || "—")}</div></div>
-          <div class="metric"><div class="k">Scraped reviews</div><div class="v mono">${fmt(a.review_count, 0)}</div></div>
-        </div>
+        <div class="app-metrics">${metrics}</div>
       </article>`;
     })
     .join("") || `<div class="empty">No apps match</div>`;
 }
 
-function fillAppFilter(apps) {
-  const sel = $("#filterApp");
-  const current = sel.value;
-  sel.innerHTML =
+function fillAppFilters(apps) {
+  const options =
     `<option value="">All apps</option>` +
     apps
       .map((a) => `<option value="${escapeHtml(a.slug)}">${escapeHtml(a.name)}</option>`)
       .join("");
-  sel.value = current;
+  $$(".app-filter").forEach((sel) => {
+    const current = sel.value;
+    sel.innerHTML = options;
+    sel.value = current;
+  });
+}
+
+function filterQuery(appSel, storeSel) {
+  const params = new URLSearchParams();
+  if ($(appSel).value) params.set("app", $(appSel).value);
+  if ($(storeSel).value) params.set("store", $(storeSel).value);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+async function loadOverview() {
+  const d = await api(`/api/dashboard${filterQuery("#ovApp", "#ovStore")}`);
+  state.dashboard = d;
+  renderKPIs(d);
+  renderRatingChart(d);
+  renderTimelineChart(d);
+  renderLeaderboard(d);
+  renderRecent(d);
+  updateSyncPill(d);
+}
+
+async function loadThemes() {
+  renderThemes(await api(`/api/dashboard${filterQuery("#thApp", "#thStore")}`));
 }
 
 async function loadReviews() {
@@ -411,22 +477,10 @@ async function applyShareMode() {
 
 async function refreshAll() {
   chartDefaults();
-  const [dashboard, apps] = await Promise.all([
-    api("/api/dashboard"),
-    api("/api/apps"),
-  ]);
-  state.dashboard = dashboard;
-  state.apps = apps;
-
-  renderKPIs(dashboard);
-  renderRatingChart(dashboard);
-  renderTimelineChart(dashboard);
-  renderLeaderboard(dashboard);
-  renderRecent(dashboard);
-  renderThemes(dashboard);
-  renderApps(apps);
-  fillAppFilter(apps);
-  updateSyncPill(dashboard);
+  state.apps = await api("/api/apps");
+  fillAppFilters(state.apps);
+  renderApps(state.apps);
+  await Promise.all([loadOverview(), loadThemes()]);
 }
 
 function formatAutoSync(st) {
@@ -500,6 +554,15 @@ function wire() {
   );
   $("#syncBtn").addEventListener("click", startSync);
   $("#appSearch").addEventListener("input", () => renderApps(state.apps));
+  ["#apApp", "#apStore"].forEach((sel) =>
+    $(sel).addEventListener("change", () => renderApps(state.apps))
+  );
+  ["#ovApp", "#ovStore"].forEach((sel) =>
+    $(sel).addEventListener("change", () => loadOverview().catch((e) => toast(e.message)))
+  );
+  ["#thApp", "#thStore"].forEach((sel) =>
+    $(sel).addEventListener("change", () => loadThemes().catch((e) => toast(e.message)))
+  );
   $("#filterBtn").addEventListener("click", () => {
     state.reviewsOffset = 0;
     loadReviews().catch((e) => toast(e.message));

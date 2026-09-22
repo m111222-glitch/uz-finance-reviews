@@ -122,8 +122,11 @@ def logout(response: Response) -> dict[str, str]:
 
 
 @app.get("/api/dashboard")
-def dashboard() -> dict[str, Any]:
-    stats = db.dashboard_stats()
+def dashboard(
+    app: str | None = Query(None, description="App slug"),
+    store: str | None = Query(None, pattern="^(play|ios|huawei|xiaomi)$"),
+) -> dict[str, Any]:
+    stats = db.dashboard_stats(app_slug=app, store=store)
     return analytics.enrich_dashboard(stats)
 
 

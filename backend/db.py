@@ -261,6 +261,8 @@ def get_apps() -> list[dict[str, Any]]:
                 (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug) AS review_count,
                 (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'play') AS play_review_count,
                 (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'ios') AS ios_review_count,
+                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'huawei') AS huawei_review_count,
+                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'xiaomi') AS xiaomi_review_count,
                 (SELECT AVG(rating) FROM reviews r WHERE r.app_slug = a.slug) AS avg_review_rating
             FROM apps a
             ORDER BY a.name COLLATE NOCASE
@@ -321,10 +323,28 @@ def query_reviews(
         return [dict(row) for row in rows], total
 
 
-def dashboard_stats() -> dict[str, Any]:
+def dashboard_stats(
+    *, app_slug: str | None = None, store: str | None = None
+) -> dict[str, Any]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if app_slug:
+        clauses.append("r.app_slug = ?")
+        params.append(app_slug)
+    if store:
+        clauses.append("r.store = ?")
+        params.append(store)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    and_where = f"AND {' AND '.join(clauses)}" if clauses else ""
+
+    # Leaderboard keeps every app row (LEFT JOIN), so the store filter goes in the join
+    join_store = "AND r.store = ?" if store else ""
+    app_where = "WHERE a.slug = ?" if app_slug else ""
+    by_app_params = ([store] if store else []) + ([app_slug] if app_slug else [])
+
     with connect() as conn:
         totals = conn.execute(
-            """
+            f"""
             SELECT
                 COUNT(*) AS total_reviews,
                 AVG(rating) AS avg_rating,
@@ -334,64 +354,74 @@ def dashboard_stats() -> dict[str, Any]:
                 SUM(CASE WHEN store = 'xiaomi' THEN 1 ELSE 0 END) AS xiaomi_count,
                 SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) AS negative_count,
                 SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) AS positive_count
-            FROM reviews
-            """
+            FROM reviews r
+            {where}
+            """,
+            params,
         ).fetchone()
 
         rating_dist = conn.execute(
-            """
+            f"""
             SELECT rating, COUNT(*) AS count
-            FROM reviews
+            FROM reviews r
+            {where}
             GROUP BY rating
             ORDER BY rating
-            """
+            """,
+            params,
         ).fetchall()
 
         by_app = conn.execute(
-            """
+            f"""
             SELECT a.slug, a.name, a.brand, a.play_rating, a.ios_rating,
                    a.play_ratings_count, a.ios_ratings_count,
                    COUNT(r.id) AS scraped_reviews,
                    AVG(r.rating) AS avg_scraped_rating,
                    SUM(CASE WHEN r.rating <= 2 THEN 1 ELSE 0 END) AS negatives
             FROM apps a
-            LEFT JOIN reviews r ON r.app_slug = a.slug
+            LEFT JOIN reviews r ON r.app_slug = a.slug {join_store}
+            {app_where}
             GROUP BY a.slug
             ORDER BY scraped_reviews DESC, a.name
-            """
+            """,
+            by_app_params,
         ).fetchall()
 
         timeline = conn.execute(
-            """
+            f"""
             SELECT substr(review_date, 1, 10) AS day,
                    COUNT(*) AS count,
                    AVG(rating) AS avg_rating
-            FROM reviews
-            WHERE review_date IS NOT NULL AND length(review_date) >= 10
+            FROM reviews r
+            WHERE review_date IS NOT NULL AND length(review_date) >= 10 {and_where}
             GROUP BY day
             ORDER BY day DESC
             LIMIT 90
-            """
+            """,
+            params,
         ).fetchall()
 
         recent = conn.execute(
-            """
+            f"""
             SELECT r.*, a.name AS app_name
             FROM reviews r
             JOIN apps a ON a.slug = r.app_slug
+            {where}
             ORDER BY COALESCE(r.review_date, r.scraped_at) DESC
             LIMIT 20
-            """
+            """,
+            params,
         ).fetchall()
 
         keywords = conn.execute(
-            """
+            f"""
             SELECT lower(body) AS body, rating
-            FROM reviews
-            WHERE body IS NOT NULL AND length(body) > 10
+            FROM reviews r
+            WHERE body IS NOT NULL AND length(body) > 10 {and_where}
             ORDER BY review_date DESC
             LIMIT 2000
-            """
+            """,
+            params,
         ).fetchall()
 
         last_sync = conn.execute(

@@ -51,13 +51,23 @@
 
       <!-- OVERVIEW -->
       <section id="view-overview" class="view">
+        <div class="filters filters-row">
+          <select id="ovApp" class="app-filter"><option value="">All apps</option></select>
+          <select id="ovStore">
+            <option value="">All stores</option>
+            <option value="play">Play Store</option>
+            <option value="ios">App Store</option>
+            <option value="huawei">Huawei AppGallery</option>
+            <option value="xiaomi">Xiaomi GetApps</option>
+          </select>
+        </div>
         <div class="kpi-grid" id="kpiGrid"></div>
 
         <div class="grid-2">
           <div class="card">
             <div class="card-head">
               <h3>Rating distribution</h3>
-              <span class="muted tiny">All scraped reviews</span>
+              <span class="muted tiny">Scraped reviews</span>
             </div>
             <canvas id="ratingChart" height="180"></canvas>
           </div>
@@ -103,7 +113,15 @@
 
       <!-- APPS -->
       <section id="view-apps" class="view">
-        <div class="filters">
+        <div class="filters filters-row">
+          <select id="apApp" class="app-filter"><option value="">All apps</option></select>
+          <select id="apStore">
+            <option value="">All stores</option>
+            <option value="play">Play Store</option>
+            <option value="ios">App Store</option>
+            <option value="huawei">Huawei AppGallery</option>
+            <option value="xiaomi">Xiaomi GetApps</option>
+          </select>
           <input id="appSearch" type="search" placeholder="Filter apps…" />
         </div>
         <div class="apps-grid" id="appsGrid"></div>
@@ -112,7 +130,7 @@
       <!-- REVIEWS -->
       <section id="view-reviews" class="view active">
         <div class="filters filters-row">
-          <select id="filterApp"><option value="">All apps</option></select>
+          <select id="filterApp" class="app-filter"><option value="">All apps</option></select>
           <select id="filterStore">
             <option value="">All stores</option>
             <option value="play">Play Store</option>
@@ -147,6 +165,16 @@
 
       <!-- THEMES -->
       <section id="view-themes" class="view">
+        <div class="filters filters-row">
+          <select id="thApp" class="app-filter"><option value="">All apps</option></select>
+          <select id="thStore">
+            <option value="">All stores</option>
+            <option value="play">Play Store</option>
+            <option value="ios">App Store</option>
+            <option value="huawei">Huawei AppGallery</option>
+            <option value="xiaomi">Xiaomi GetApps</option>
+          </select>
+        </div>
         <div class="grid-2">
           <div class="card">
             <div class="card-head">
