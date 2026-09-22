@@ -275,6 +275,9 @@ a { color: var(--primary); }
   min-width: 140px;
 }
 .filters input[type="search"] { min-width: 220px; flex: 1; }
+.filters input[type="date"] { color-scheme: dark; min-width: 0; }
+.date-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.date-range[hidden] { display: none; }
 
 .apps-grid {
   display: grid;

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -125,8 +126,10 @@ def logout(response: Response) -> dict[str, str]:
 def dashboard(
     app: str | None = Query(None, description="App slug"),
     store: str | None = Query(None, pattern="^(play|ios|huawei|xiaomi)$"),
+    date_from: date | None = Query(None, description="Tashkent date, inclusive"),
+    date_to: date | None = Query(None, description="Tashkent date, inclusive"),
 ) -> dict[str, Any]:
-    stats = db.dashboard_stats(app_slug=app, store=store)
+    stats = db.dashboard_stats(app_slug=app, store=store, date_from=date_from, date_to=date_to)
     return analytics.enrich_dashboard(stats)
 
 
@@ -152,6 +155,8 @@ def list_reviews(
     store: str | None = Query(None, pattern="^(play|ios|huawei|xiaomi)$"),
     rating: int | None = Query(None, ge=1, le=5),
     q: str | None = Query(None, description="Search text"),
+    date_from: date | None = Query(None, description="Tashkent date, inclusive"),
+    date_to: date | None = Query(None, description="Tashkent date, inclusive"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
@@ -160,6 +165,8 @@ def list_reviews(
         store=store,
         rating=rating,
         q=q,
+        date_from=date_from,
+        date_to=date_to,
         limit=limit,
         offset=offset,
     )

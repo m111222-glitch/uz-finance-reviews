@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -16,8 +16,28 @@ DB_PATH = DATA_DIR / "reviews.db"
 CATALOG_PATH = ROOT / "apps_catalog.json"
 
 
+TASHKENT = timezone(timedelta(hours=5))
+
+
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _date_clauses(date_from: date | None, date_to: date | None) -> tuple[list[str], list[Any]]:
+    """Inclusive Tashkent calendar-day range as UTC ISO bounds on the review date."""
+    clauses: list[str] = []
+    params: list[Any] = []
+
+    def bound(d: date) -> str:
+        return datetime(d.year, d.month, d.day, tzinfo=TASHKENT).astimezone(timezone.utc).isoformat()
+
+    if date_from:
+        clauses.append("COALESCE(r.review_date, r.scraped_at) >= ?")
+        params.append(bound(date_from))
+    if date_to:
+        clauses.append("COALESCE(r.review_date, r.scraped_at) < ?")
+        params.append(bound(date_to + timedelta(days=1)))
+    return clauses, params
 
 
 @contextmanager
@@ -283,11 +303,12 @@ def query_reviews(
     store: str | None = None,
     rating: int | None = None,
     q: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int]:
-    clauses: list[str] = []
-    params: list[Any] = []
+    clauses, params = _date_clauses(date_from, date_to)
 
     if app_slug:
         clauses.append("r.app_slug = ?")
@@ -324,23 +345,29 @@ def query_reviews(
 
 
 def dashboard_stats(
-    *, app_slug: str | None = None, store: str | None = None
+    *,
+    app_slug: str | None = None,
+    store: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> dict[str, Any]:
-    clauses: list[str] = []
-    params: list[Any] = []
+    # Review-side filters (store + dates) apply to every query; the app filter too,
+    # except the leaderboard, which keeps each app row via LEFT JOIN
+    join_clauses, join_params = _date_clauses(date_from, date_to)
+    if store:
+        join_clauses.append("r.store = ?")
+        join_params.append(store)
+    clauses, params = list(join_clauses), list(join_params)
     if app_slug:
         clauses.append("r.app_slug = ?")
         params.append(app_slug)
-    if store:
-        clauses.append("r.store = ?")
-        params.append(store)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     and_where = f"AND {' AND '.join(clauses)}" if clauses else ""
 
-    # Leaderboard keeps every app row (LEFT JOIN), so the store filter goes in the join
-    join_store = "AND r.store = ?" if store else ""
+    join_extra = f"AND {' AND '.join(join_clauses)}" if join_clauses else ""
     app_where = "WHERE a.slug = ?" if app_slug else ""
-    by_app_params = ([store] if store else []) + ([app_slug] if app_slug else [])
+    by_app_params = join_params + ([app_slug] if app_slug else [])
+    has_dates = bool(date_from or date_to)
 
     with connect() as conn:
         totals = conn.execute(
@@ -379,7 +406,7 @@ def dashboard_stats(
                    AVG(r.rating) AS avg_scraped_rating,
                    SUM(CASE WHEN r.rating <= 2 THEN 1 ELSE 0 END) AS negatives
             FROM apps a
-            LEFT JOIN reviews r ON r.app_slug = a.slug {join_store}
+            LEFT JOIN reviews r ON r.app_slug = a.slug {join_extra}
             {app_where}
             GROUP BY a.slug
             ORDER BY scraped_reviews DESC, a.name
@@ -389,14 +416,14 @@ def dashboard_stats(
 
         timeline = conn.execute(
             f"""
-            SELECT substr(review_date, 1, 10) AS day,
+            SELECT date(review_date, '+5 hours') AS day,
                    COUNT(*) AS count,
                    AVG(rating) AS avg_rating
             FROM reviews r
             WHERE review_date IS NOT NULL AND length(review_date) >= 10 {and_where}
             GROUP BY day
             ORDER BY day DESC
-            LIMIT 90
+            {"" if has_dates else "LIMIT 90"}
             """,
             params,
         ).fetchall()

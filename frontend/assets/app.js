@@ -40,6 +40,59 @@ function storeBadge(store) {
   return "";
 }
 
+const TASHKENT_OFFSET_MS = 5 * 3600 * 1000;
+
+function tashkentDay(daysAgo = 0) {
+  return new Date(Date.now() + TASHKENT_OFFSET_MS - daysAgo * 86400000).toISOString().slice(0, 10);
+}
+
+function tashkentDate(iso) {
+  const t = Date.parse(iso || "");
+  return Number.isNaN(t) ? (iso || "").slice(0, 10) : new Date(t + TASHKENT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function periodRange(prefix) {
+  switch ($(`#${prefix}Period`).value) {
+    case "today": return [tashkentDay(0), tashkentDay(0)];
+    case "yesterday": return [tashkentDay(1), tashkentDay(1)];
+    case "7d": return [tashkentDay(6), tashkentDay(0)];
+    case "30d": return [tashkentDay(29), tashkentDay(0)];
+    case "custom": return [$(`#${prefix}From`).value, $(`#${prefix}To`).value];
+    default: return ["", ""];
+  }
+}
+
+function filterParams(prefix) {
+  const params = new URLSearchParams();
+  const app = $(`#${prefix}App`).value;
+  const store = $(`#${prefix}Store`).value;
+  const [from, to] = periodRange(prefix);
+  if (app) params.set("app", app);
+  if (store) params.set("store", store);
+  if (from) params.set("date_from", from);
+  if (to) params.set("date_to", to);
+  return params;
+}
+
+function wirePeriod(prefix, onChange) {
+  const range = $(`#${prefix}Range`);
+  const from = $(`#${prefix}From`);
+  const to = $(`#${prefix}To`);
+  from.max = to.max = tashkentDay(0);
+  // Browsers may restore a "custom" selection on reload
+  range.hidden = $(`#${prefix}Period`).value !== "custom";
+  $(`#${prefix}Period`).addEventListener("change", (e) => {
+    const custom = e.target.value === "custom";
+    range.hidden = !custom;
+    if (custom && !from.value && !to.value) {
+      from.value = tashkentDay(6);
+      to.value = tashkentDay(0);
+    }
+    onChange?.();
+  });
+  [from, to].forEach((el) => el.addEventListener("change", () => onChange?.()));
+}
+
 function escapeHtml(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;")
@@ -226,7 +279,7 @@ function renderLeaderboard(d) {
 }
 
 function reviewCard(r) {
-  const date = (r.review_date || r.scraped_at || "").slice(0, 10);
+  const date = tashkentDate(r.review_date || r.scraped_at);
   return `<article class="review-item">
     <div class="review-meta">
       <strong style="color:var(--text)">${escapeHtml(r.app_name || r.app_slug)}</strong>
@@ -395,16 +448,17 @@ function fillAppFilters(apps) {
   });
 }
 
-function filterQuery(appSel, storeSel) {
-  const params = new URLSearchParams();
-  if ($(appSel).value) params.set("app", $(appSel).value);
-  if ($(storeSel).value) params.set("store", $(storeSel).value);
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
+// Filters fire a request per change; drop responses superseded by a newer one
+const latestRequest = {};
+async function latest(key, path) {
+  const seq = (latestRequest[key] = (latestRequest[key] || 0) + 1);
+  const data = await api(path);
+  return seq === latestRequest[key] ? data : null;
 }
 
 async function loadOverview() {
-  const d = await api(`/api/dashboard${filterQuery("#ovApp", "#ovStore")}`);
+  const d = await latest("overview", `/api/dashboard?${filterParams("ov")}`);
+  if (!d) return;
   state.dashboard = d;
   renderKPIs(d);
   renderRatingChart(d);
@@ -415,24 +469,21 @@ async function loadOverview() {
 }
 
 async function loadThemes() {
-  renderThemes(await api(`/api/dashboard${filterQuery("#thApp", "#thStore")}`));
+  const d = await latest("themes", `/api/dashboard?${filterParams("th")}`);
+  if (d) renderThemes(d);
 }
 
 async function loadReviews() {
-  const params = new URLSearchParams({
-    limit: String(state.reviewsLimit),
-    offset: String(state.reviewsOffset),
-  });
-  const app = $("#filterApp").value;
-  const store = $("#filterStore").value;
+  const params = filterParams("filter");
+  params.set("limit", String(state.reviewsLimit));
+  params.set("offset", String(state.reviewsOffset));
   const rating = $("#filterRating").value;
   const q = $("#filterQ").value.trim();
-  if (app) params.set("app", app);
-  if (store) params.set("store", store);
   if (rating) params.set("rating", rating);
   if (q) params.set("q", q);
 
-  const data = await api(`/api/reviews?${params}`);
+  const data = await latest("reviews", `/api/reviews?${params}`);
+  if (!data) return;
   $("#reviewCount").textContent = `${fmt(data.total, 0)} results`;
   $("#reviewsList").innerHTML = data.items.length
     ? data.items.map(reviewCard).join("")
@@ -563,6 +614,9 @@ function wire() {
   ["#thApp", "#thStore"].forEach((sel) =>
     $(sel).addEventListener("change", () => loadThemes().catch((e) => toast(e.message)))
   );
+  wirePeriod("ov", () => loadOverview().catch((e) => toast(e.message)));
+  wirePeriod("th", () => loadThemes().catch((e) => toast(e.message)));
+  wirePeriod("filter", null);
   $("#filterBtn").addEventListener("click", () => {
     state.reviewsOffset = 0;
     loadReviews().catch((e) => toast(e.message));

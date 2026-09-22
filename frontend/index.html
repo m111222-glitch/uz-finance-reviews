@@ -60,6 +60,17 @@
             <option value="huawei">Huawei AppGallery</option>
             <option value="xiaomi">Xiaomi GetApps</option>
           </select>
+          <select id="ovPeriod">
+            <option value="">All time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <span class="date-range" id="ovRange" hidden>
+            <input type="date" id="ovFrom" aria-label="From date" /> – <input type="date" id="ovTo" aria-label="To date" />
+          </span>
         </div>
         <div class="kpi-grid" id="kpiGrid"></div>
 
@@ -73,8 +84,8 @@
           </div>
           <div class="card">
             <div class="card-head">
-              <h3>Review volume (90d)</h3>
-              <span class="muted tiny">By review date</span>
+              <h3>Review volume</h3>
+              <span class="muted tiny">Per day (Tashkent)</span>
             </div>
             <canvas id="timelineChart" height="180"></canvas>
           </div>
@@ -146,6 +157,17 @@
             <option value="2">2 ★</option>
             <option value="1">1 ★</option>
           </select>
+          <select id="filterPeriod">
+            <option value="">All time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <span class="date-range" id="filterRange" hidden>
+            <input type="date" id="filterFrom" aria-label="From date" /> – <input type="date" id="filterTo" aria-label="To date" />
+          </span>
           <input id="filterQ" type="search" placeholder="Search text…" />
           <button id="filterBtn" class="btn btn-secondary">Apply</button>
         </div>
@@ -174,6 +196,17 @@
             <option value="huawei">Huawei AppGallery</option>
             <option value="xiaomi">Xiaomi GetApps</option>
           </select>
+          <select id="thPeriod">
+            <option value="">All time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <span class="date-range" id="thRange" hidden>
+            <input type="date" id="thFrom" aria-label="From date" /> – <input type="date" id="thTo" aria-label="To date" />
+          </span>
         </div>
         <div class="grid-2">
           <div class="card">
