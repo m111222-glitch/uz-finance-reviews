@@ -35,8 +35,6 @@ function stars(n) {
 function storeBadge(store) {
   if (store === "play") return `<span class="badge play">Play</span>`;
   if (store === "ios") return `<span class="badge ios">iOS</span>`;
-  if (store === "huawei") return `<span class="badge play">Huawei</span>`;
-  if (store === "xiaomi") return `<span class="badge ios">Xiaomi</span>`;
   return "";
 }
 
@@ -48,7 +46,55 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
+const STATIC_MODE = true;
+let _reviewsCache = null;
+
 async function api(path, opts = {}) {
+  if (STATIC_MODE) {
+    // Map API routes to exported JSON snapshots
+    if (path.startsWith("/api/dashboard") || path === "/api/dashboard") {
+      const res = await fetch("./data/dashboard.json");
+      if (!res.ok) throw new Error("Failed to load dashboard.json");
+      return res.json();
+    }
+    if (path.startsWith("/api/apps")) {
+      const res = await fetch("./data/apps.json");
+      if (!res.ok) throw new Error("Failed to load apps.json");
+      return res.json();
+    }
+    if (path.startsWith("/api/reviews")) {
+      if (!_reviewsCache) {
+        const res = await fetch("./data/reviews.json");
+        if (!res.ok) throw new Error("Failed to load reviews.json");
+        _reviewsCache = await res.json();
+      }
+      const url = new URL(path, "http://local");
+      const app = url.searchParams.get("app") || "";
+      const store = url.searchParams.get("store") || "";
+      const rating = url.searchParams.get("rating") || "";
+      const q = (url.searchParams.get("q") || "").toLowerCase();
+      const limit = Number(url.searchParams.get("limit") || 40);
+      const offset = Number(url.searchParams.get("offset") || 0);
+      let items = _reviewsCache.items || [];
+      if (app) items = items.filter((r) => r.app_slug === app);
+      if (store) items = items.filter((r) => r.store === store);
+      if (rating) items = items.filter((r) => String(r.rating) === String(rating));
+      if (q) {
+        items = items.filter((r) =>
+          ((r.body || "") + " " + (r.title || "") + " " + (r.author || "")).toLowerCase().includes(q)
+        );
+      }
+      const total = items.length;
+      return { items: items.slice(offset, offset + limit), total, limit, offset };
+    }
+    if (path.startsWith("/api/sync")) {
+      return { running: false, last_result: null, readonly: true, status: "readonly" };
+    }
+    if (path.startsWith("/api/auth/status") || path.startsWith("/api/health")) {
+      return { auth_required: false, authenticated: true, readonly: true, status: "ok" };
+    }
+    throw new Error("Not available in static mode: " + path);
+  }
   const res = await fetch(path, {
     ...opts,
     credentials: "include",
@@ -117,7 +163,7 @@ function renderKPIs(d) {
     <div class="kpi accent">
       <div class="label">Scraped reviews</div>
       <div class="value">${fmt(total, 0)}</div>
-      <div class="hint">Play ${fmt(t.play_count, 0)} · iOS ${fmt(t.ios_count, 0)} · HW ${fmt(t.huawei_count, 0)} · Mi ${fmt(t.xiaomi_count, 0)}</div>
+      <div class="hint">Play ${fmt(t.play_count, 0)} · iOS ${fmt(t.ios_count, 0)}</div>
     </div>
     <div class="kpi">
       <div class="label">Avg rating (sample)</div>
@@ -429,17 +475,6 @@ async function refreshAll() {
   updateSyncPill(dashboard);
 }
 
-function formatAutoSync(st) {
-  const auto = st.auto_sync || {};
-  if (!auto.enabled) return "manual only";
-  const h = auto.interval_hours;
-  const since = auto.hours_since_last_ok;
-  if (st.running) return "running…";
-  if (since == null) return `every ${h}h · first run soon`;
-  const next = auto.next_sync_at ? auto.next_sync_at.slice(11, 16) + " UTC" : "";
-  return `every ${h}h · last ${since.toFixed(1)}h ago${next ? " · next " + next : ""}`;
-}
-
 async function pollSync() {
   try {
     const st = await api("/api/sync/status");
@@ -451,8 +486,11 @@ async function pollSync() {
       setTimeout(pollSync, 2500);
     } else {
       btn.disabled = false;
-      btn.textContent = "Sync now";
-      $("#syncStatus").textContent = formatAutoSync(st);
+      btn.textContent = "Sync stores";
+      if (st.last_result) {
+        const r = st.last_result;
+        $("#syncStatus").textContent = `${r.status} · play ${r.play_reviews || 0} · ios ${r.ios_reviews || 0}`;
+      }
     }
   } catch {
     /* ignore */
@@ -460,6 +498,8 @@ async function pollSync() {
 }
 
 async function startSync() {
+  toast("Static snapshot — re-export & redeploy to refresh data");
+  return;
   const btn = $("#syncBtn");
   btn.disabled = true;
   btn.textContent = "Starting…";
@@ -477,10 +517,7 @@ async function startSync() {
         await refreshAll();
         await loadReviews();
         if (st.last_result?.status === "ok") {
-          toast(
-            `Synced: Play ${st.last_result.play_reviews || 0} · iOS ${st.last_result.ios_reviews || 0}` +
-              ` · HW ${st.last_result.huawei_reviews || 0} · Mi ${st.last_result.xiaomi_reviews || 0}`
-          );
+          toast(`Synced: ${st.last_result.play_reviews} Play + ${st.last_result.ios_reviews} iOS reviews`);
         } else if (st.last_result?.status === "error") {
           toast("Sync finished with errors — check API logs");
         }
@@ -490,7 +527,7 @@ async function startSync() {
   } catch (e) {
     toast("Failed to start sync: " + e.message);
     btn.disabled = false;
-    btn.textContent = "Sync now";
+    btn.textContent = "Sync stores";
   }
 }
 
@@ -522,7 +559,6 @@ function wire() {
 
 async function main() {
   wire();
-  setView("reviews");
   try {
     await applyShareMode();
     await refreshAll();

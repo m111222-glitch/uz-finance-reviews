@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -10,7 +11,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "data" / "reviews.db"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
+DB_PATH = DATA_DIR / "reviews.db"
 CATALOG_PATH = ROOT / "apps_catalog.json"
 
 
@@ -58,7 +60,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS reviews (
                 id TEXT PRIMARY KEY,
                 app_slug TEXT NOT NULL,
-                store TEXT NOT NULL CHECK (store IN ('play', 'ios')),
+                store TEXT NOT NULL,
                 author TEXT,
                 rating INTEGER,
                 title TEXT,
@@ -85,8 +87,83 @@ def init_db() -> None:
                 stats_json TEXT,
                 error TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS telegram_posts (
+                review_id TEXT PRIMARY KEY,
+                rating INTEGER,
+                posted_at TEXT NOT NULL,
+                FOREIGN KEY (review_id) REFERENCES reviews(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS telegram_summaries (
+                day TEXT PRIMARY KEY,
+                posted_at TEXT NOT NULL,
+                payload_json TEXT
+            );
             """
         )
+        _migrate_reviews_store(conn)
+        for col, decl in (
+            ("huawei_id", "TEXT"),
+            ("huawei_rating", "REAL"),
+            ("xiaomi_id", "TEXT"),
+            ("xiaomi_rating", "REAL"),
+        ):
+            _ensure_column(conn, "apps", col, decl)
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+def _migrate_reviews_store(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='reviews'"
+    ).fetchone()
+    sql = (row[0] if row else "") or ""
+    if "play', 'ios'" not in sql and "play', 'ios" not in sql:
+        # already migrated or created without CHECK
+        if "CHECK" not in sql:
+            return
+    if "huawei" in sql:
+        return
+    # telegram_posts.review_id references reviews(id); rebuilding the table
+    # (drop + rename) with FK enforcement on would fail once that table has rows.
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS reviews_v2 (
+                id TEXT PRIMARY KEY,
+                app_slug TEXT NOT NULL,
+                store TEXT NOT NULL,
+                author TEXT,
+                rating INTEGER,
+                title TEXT,
+                body TEXT,
+                language TEXT,
+                version TEXT,
+                thumbs_up INTEGER DEFAULT 0,
+                review_date TEXT,
+                scraped_at TEXT NOT NULL,
+                raw_json TEXT,
+                FOREIGN KEY (app_slug) REFERENCES apps(slug)
+            );
+            INSERT OR IGNORE INTO reviews_v2
+            SELECT id, app_slug, store, author, rating, title, body, language, version,
+                   thumbs_up, review_date, scraped_at, raw_json FROM reviews;
+            DROP TABLE reviews;
+            ALTER TABLE reviews_v2 RENAME TO reviews;
+            CREATE INDEX IF NOT EXISTS idx_reviews_app ON reviews(app_slug);
+            CREATE INDEX IF NOT EXISTS idx_reviews_store ON reviews(store);
+            CREATE INDEX IF NOT EXISTS idx_reviews_date ON reviews(review_date);
+            CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
+            """
+        )
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def load_catalog() -> dict[str, Any]:
@@ -101,14 +178,16 @@ def upsert_apps_from_catalog() -> int:
         for app in catalog["apps"]:
             conn.execute(
                 """
-                INSERT INTO apps (slug, name, brand, play_id, ios_id, ios_bundle)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO apps (slug, name, brand, play_id, ios_id, ios_bundle, huawei_id, xiaomi_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(slug) DO UPDATE SET
                     name = excluded.name,
                     brand = excluded.brand,
                     play_id = excluded.play_id,
                     ios_id = excluded.ios_id,
-                    ios_bundle = excluded.ios_bundle
+                    ios_bundle = excluded.ios_bundle,
+                    huawei_id = COALESCE(excluded.huawei_id, apps.huawei_id),
+                    xiaomi_id = COALESCE(excluded.xiaomi_id, apps.xiaomi_id)
                 """,
                 (
                     app["slug"],
@@ -117,6 +196,8 @@ def upsert_apps_from_catalog() -> int:
                     app.get("play_id"),
                     app.get("ios_id"),
                     app.get("ios_bundle"),
+                    app.get("huawei_id"),
+                    app.get("xiaomi_id") or app.get("play_id"),
                 ),
             )
             count += 1
@@ -249,6 +330,8 @@ def dashboard_stats() -> dict[str, Any]:
                 AVG(rating) AS avg_rating,
                 SUM(CASE WHEN store = 'play' THEN 1 ELSE 0 END) AS play_count,
                 SUM(CASE WHEN store = 'ios' THEN 1 ELSE 0 END) AS ios_count,
+                SUM(CASE WHEN store = 'huawei' THEN 1 ELSE 0 END) AS huawei_count,
+                SUM(CASE WHEN store = 'xiaomi' THEN 1 ELSE 0 END) AS xiaomi_count,
                 SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) AS negative_count,
                 SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) AS positive_count
             FROM reviews
@@ -328,6 +411,110 @@ def dashboard_stats() -> dict[str, Any]:
         "last_sync": dict(last_sync) if last_sync else None,
         "app_count": len(by_app),
     }
+
+
+def unposted_star_reviews(
+    *,
+    ratings: tuple[int, ...] = (1, 2, 3, 4, 5),
+    since_iso: str | None = None,
+    limit: int = 80,
+) -> list[dict[str, Any]]:
+    placeholders = ",".join("?" * len(ratings))
+    clauses = [
+        f"r.rating IN ({placeholders})",
+        "r.body IS NOT NULL",
+        "length(trim(r.body)) >= 20",
+        "t.review_id IS NULL",
+    ]
+    params: list[Any] = list(ratings)
+    if since_iso:
+        clauses.append("COALESCE(r.review_date, r.scraped_at) >= ?")
+        params.append(since_iso)
+    where = " AND ".join(clauses)
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT r.*, a.name AS app_name, a.brand
+            FROM reviews r
+            JOIN apps a ON a.slug = r.app_slug
+            LEFT JOIN telegram_posts t ON t.review_id = r.id
+            WHERE {where}
+            ORDER BY COALESCE(r.review_date, r.scraped_at) DESC
+            LIMIT ?
+            """,
+            params + [limit],
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def reviews_in_range(
+    *,
+    start_iso: str,
+    end_iso: str,
+    slugs: list[str] | tuple[str, ...] | None = None,
+) -> list[dict[str, Any]]:
+    clauses = ["COALESCE(r.review_date, r.scraped_at) >= ?", "COALESCE(r.review_date, r.scraped_at) < ?"]
+    params: list[Any] = [start_iso, end_iso]
+    if slugs:
+        placeholders = ",".join("?" * len(slugs))
+        clauses.append(f"r.app_slug IN ({placeholders})")
+        params.extend(slugs)
+    where = " AND ".join(clauses)
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT r.*, a.name AS app_name, a.brand
+            FROM reviews r
+            JOIN apps a ON a.slug = r.app_slug
+            WHERE {where}
+            ORDER BY COALESCE(r.review_date, r.scraped_at) DESC
+            """,
+            params,
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def summary_posted(day: str) -> bool:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM telegram_summaries WHERE day = ?", (day,)
+        ).fetchone()
+        return bool(row)
+
+
+def mark_summary_posted(day: str, payload: dict[str, Any] | None = None) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO telegram_summaries (day, posted_at, payload_json)
+            VALUES (?, ?, ?)
+            """,
+            (day, utcnow(), json.dumps(payload or {}, ensure_ascii=False)),
+        )
+
+
+def mark_telegram_posted(review_id: str, rating: int | None) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO telegram_posts (review_id, rating, posted_at)
+            VALUES (?, ?, ?)
+            """,
+            (review_id, rating, utcnow()),
+        )
+
+
+def last_successful_sync() -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM sync_runs
+            WHERE status = 'ok'
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def start_sync_run() -> int:

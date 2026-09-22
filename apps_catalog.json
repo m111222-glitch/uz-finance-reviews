@@ -122,6 +122,206 @@
       "play_id": "uz.agrobank.mobile",
       "ios_id": "1638716474",
       "ios_bundle": "uz.agrobank.mobile-ios"
+    },
+    {
+      "slug": "imanum",
+      "name": "IMANUM",
+      "brand": "IMANUM",
+      "play_id": "uz.iman.iman_installments",
+      "ios_id": "1625307273",
+      "ios_bundle": "uz.iman.imaninstallment"
+    },
+    {
+      "slug": "paynet",
+      "name": "Paynet",
+      "brand": "Paynet",
+      "play_id": "uz.paynet.app",
+      "ios_id": "1307888692",
+      "ios_bundle": "GS.Uzpaynet"
+    },
+    {
+      "slug": "avo",
+      "name": "AVO",
+      "brand": "AVO",
+      "play_id": "uz.avo.app",
+      "ios_id": "6463799850",
+      "ios_bundle": "uz.avo.app"
+    },
+    {
+      "slug": "tez",
+      "name": "Tez",
+      "brand": "Tez",
+      "play_id": "uz.hamkorbank.tezbank",
+      "ios_id": "6747576859",
+      "ios_bundle": "uz.hamkorbank.tezbank"
+    },
+    {
+      "slug": "monix",
+      "name": "MONIX",
+      "brand": "MONIX",
+      "play_id": "uz.iyb.monix",
+      "ios_id": "6743887047",
+      "ios_bundle": "uz.iyb.monix"
+    },
+    {
+      "slug": "variant-nasiya",
+      "name": "Variant nasiya",
+      "brand": "Variant",
+      "play_id": "uz.variant.android",
+      "ios_id": "6757391217",
+      "ios_bundle": "com.techriseit.variant"
+    },
+    {
+      "slug": "milliy",
+      "name": "Milliy 2.0",
+      "brand": "Milliy",
+      "play_id": "com.tune.milliy",
+      "ios_id": "1297283006",
+      "ios_bundle": "com.nbu.milliy"
+    },
+    {
+      "slug": "domo",
+      "name": "DOMO",
+      "brand": "DOMO",
+      "play_id": "org.uicgroup.hudud_gaz",
+      "ios_id": "6737195225",
+      "ios_bundle": "org.uicgroup.hududGaz"
+    },
+    {
+      "slug": "ipoteka-mobile",
+      "name": "Ipoteka Mobile",
+      "brand": "Ipoteka Bank",
+      "play_id": "com.IpotekaMobile.v2",
+      "ios_id": "6502378970",
+      "ios_bundle": "com.IpotekaMobile.v2"
+    },
+    {
+      "slug": "zoomrad",
+      "name": "Zoomrad",
+      "brand": "Zoomrad",
+      "play_id": "uz.aloqabank.zoomrad",
+      "ios_id": "1522419775",
+      "ios_bundle": "uz.zoomrad"
+    },
+    {
+      "slug": "asakabank",
+      "name": "Asakabank",
+      "brand": "Asakabank",
+      "play_id": "uz.asakabank.myasaka",
+      "ios_id": "1574165416",
+      "ios_bundle": "uz.asakabank.my"
+    },
+    {
+      "slug": "infinbank",
+      "name": "InfinBANK",
+      "brand": "InfinBANK",
+      "play_id": "uz.xsoft.myinfin",
+      "ios_id": "1454367354",
+      "ios_bundle": "com.infin.myinfin"
+    },
+    {
+      "slug": "tenge24",
+      "name": "Tenge24",
+      "brand": "Tenge24",
+      "play_id": "uz.tune.tenge",
+      "ios_id": "1586139053",
+      "ios_bundle": "uz.tenge.home"
+    },
+    {
+      "slug": "ipoteka-retail",
+      "name": "Ipoteka Retail",
+      "brand": "Ipoteka Bank",
+      "play_id": "com.bss.ipotekabank.retail.lite",
+      "ios_id": "1637057203",
+      "ios_bundle": "com.bss.ipotekabank.retail.lite"
+    },
+    {
+      "slug": "mavrid",
+      "name": "MAVRID",
+      "brand": "MAVRID",
+      "play_id": "uz.tune.mkbdbo",
+      "ios_id": "6445884560",
+      "ios_bundle": "uz.tune.mkbuz.mavrid"
+    },
+    {
+      "slug": "openbank-uz",
+      "name": "Openbank UZ",
+      "brand": "Openbank",
+      "play_id": "uz.smartbank",
+      "ios_id": "6446754221",
+      "ios_bundle": "com.SmartBankAJ.com"
+    },
+    {
+      "slug": "apex",
+      "name": "APEX",
+      "brand": "APEX",
+      "play_id": "com.fincube.apexbank",
+      "ios_id": "6469687454",
+      "ios_bundle": "uz.apexbank.apexmobile"
+    },
+    {
+      "slug": "oson",
+      "name": "OSON",
+      "brand": "OSON",
+      "play_id": "com.oson",
+      "ios_id": "1207834182",
+      "ios_bundle": "uz.oson"
+    },
+    {
+      "slug": "humans",
+      "name": "HUMANS",
+      "brand": "HUMANS",
+      "play_id": "net.humans.fintech_uz",
+      "ios_id": "1508198703",
+      "ios_bundle": "net.humans.fintech-uz"
+    },
+    {
+      "slug": "brb",
+      "name": "BRB",
+      "brand": "BRB",
+      "play_id": "com.qqb.quant",
+      "ios_id": "1524422825",
+      "ios_bundle": "com.qqb.ios"
+    },
+    {
+      "slug": "ofb",
+      "name": "OFB",
+      "brand": "OFB",
+      "play_id": "uz.ofbmobile.android",
+      "ios_id": "6443708765",
+      "ios_bundle": "uz.ofb.mobile"
+    },
+    {
+      "slug": "trastpay",
+      "name": "Trastpay",
+      "brand": "Trastpay",
+      "play_id": "trastpay.uz",
+      "ios_id": "6443658536",
+      "ios_bundle": "trastpay.uz"
+    },
+    {
+      "slug": "hayot-bank",
+      "name": "Hayot Bank",
+      "brand": "Hayot Bank",
+      "play_id": "uz.cbssolutions.mobile",
+      "ios_id": "6468219656",
+      "ios_bundle": "uz.hayotbank.mobile"
+    },
+    {
+      "slug": "open-muddatli",
+      "name": "Open Muddatli To'lov",
+      "brand": "Open",
+      "play_id": "com.open.uz",
+      "ios_id": "6444692644",
+      "ios_bundle": "com.openfintech.open"
+    },
+    {
+      "slug": "tayanch",
+      "name": "tayanch",
+      "brand": "tayanch",
+      "play_id": "uz.finance.tayyab",
+      "ios_id": "6737691444",
+      "ios_bundle": "uz.tayyab.finance"
     }
   ]
 }

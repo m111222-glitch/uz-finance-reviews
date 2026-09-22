@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from backend import analytics, auth, db
+from backend import analytics, auth, db, notify, scheduler
 from backend.sync import sync_all
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,10 +38,28 @@ _sync_lock = threading.Lock()
 _sync_state: dict[str, Any] = {"running": False, "last_result": None}
 
 
+def _run_sync(*, slug: str | None = None, play_count: int = 150, ios_pages: int = 5) -> dict[str, Any]:
+    with _sync_lock:
+        if _sync_state["running"]:
+            return {"status": "already_running"}
+        _sync_state["running"] = True
+        try:
+            result = sync_all(
+                play_review_count=play_count,
+                ios_pages=ios_pages,
+                only_slug=slug,
+            )
+            _sync_state["last_result"] = result
+            return result
+        finally:
+            _sync_state["running"] = False
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     db.init_db()
     db.upsert_apps_from_catalog()
+    scheduler.start_auto_sync_loop(lambda: _run_sync())
 
 
 class LoginBody(BaseModel):
@@ -54,6 +72,8 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "auth_required": auth.password_enabled(),
         "readonly": auth.readonly_mode(),
+        "auto_sync": scheduler.status_payload(),
+        "telegram": notify.enabled(),
     }
 
 
@@ -126,7 +146,7 @@ def get_app(slug: str) -> dict[str, Any]:
 @app.get("/api/reviews")
 def list_reviews(
     app: str | None = Query(None, description="App slug"),
-    store: str | None = Query(None, pattern="^(play|ios)$"),
+    store: str | None = Query(None, pattern="^(play|ios|huawei|xiaomi)$"),
     rating: int | None = Query(None, ge=1, le=5),
     q: str | None = Query(None, description="Search text"),
     limit: int = Query(50, ge=1, le=200),
@@ -143,12 +163,36 @@ def list_reviews(
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
+@app.get("/api/telegram/preview")
+def telegram_preview(limit: int = Query(15, ge=1, le=50)) -> dict[str, Any]:
+    """Show which 1★/5★ reviews would be posted (short/generic ones excluded)."""
+    db.init_db()
+    rows = notify.preview_candidates(limit=limit)
+    return {
+        "enabled": notify.enabled(),
+        "count": len(rows),
+        "items": [
+            {
+                "id": r.get("id"),
+                "app_name": r.get("app_name"),
+                "store": r.get("store"),
+                "rating": r.get("rating"),
+                "author": r.get("author"),
+                "review_date": r.get("review_date"),
+                "body": (r.get("body") or "")[:400],
+            }
+            for r in rows
+        ],
+    }
+
+
 @app.get("/api/sync/status")
 def sync_status() -> dict[str, Any]:
     return {
         "running": _sync_state["running"],
         "last_result": _sync_state["last_result"],
         "readonly": auth.readonly_mode(),
+        "auto_sync": scheduler.status_payload(),
     }
 
 
@@ -164,24 +208,15 @@ def trigger_sync(
     if _sync_state["running"]:
         return {"status": "already_running"}
 
-    def _run() -> None:
-        with _sync_lock:
-            _sync_state["running"] = True
-            try:
-                result = sync_all(
-                    play_review_count=play_count,
-                    ios_pages=ios_pages,
-                    only_slug=slug,
-                )
-                _sync_state["last_result"] = result
-            finally:
-                _sync_state["running"] = False
-
     if background:
-        threading.Thread(target=_run, daemon=True).start()
+        threading.Thread(
+            target=_run_sync,
+            kwargs={"slug": slug, "play_count": play_count, "ios_pages": ios_pages},
+            daemon=True,
+        ).start()
         return {"status": "started"}
-    _run()
-    return {"status": "done", "result": _sync_state["last_result"]}
+    result = _run_sync(slug=slug, play_count=play_count, ios_pages=ios_pages)
+    return {"status": "done", "result": result}
 
 
 @app.get("/login", response_class=HTMLResponse)

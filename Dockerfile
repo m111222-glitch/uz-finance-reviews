@@ -5,7 +5,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8000 \
     DASHBOARD_PASSWORD= \
-    DASHBOARD_READONLY=1
+    DASHBOARD_READONLY=0 \
+    AUTO_SYNC_HOURS=3 \
+    DATA_DIR=/app/data
 
 WORKDIR /app
 
@@ -21,11 +23,12 @@ COPY backend ./backend
 COPY frontend ./frontend
 COPY scripts ./scripts
 
-# Seed with scraped reviews so the first boot is useful offline of store APIs
-RUN mkdir -p /app/data
-COPY data/reviews.db /app/data/reviews.db
+# Seed DB lives outside the volume mount so first boot can copy it in
+RUN mkdir -p /app/data /app/seed
+COPY data/reviews.db /app/seed/reviews.db
+COPY scripts/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
-# Cloud hosts inject PORT; default 8000 for local docker runs
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["/app/entrypoint.sh"]

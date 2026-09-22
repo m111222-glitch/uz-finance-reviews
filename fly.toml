@@ -1,23 +1,30 @@
 # Fly.io permanent host for UZ Finance Reviews
-# One-time deploy from Terminal:  ./scripts/deploy-fly.sh
+# Deploy: flyctl deploy --remote-only
 # Docs: https://fly.io/docs/
 
-app = 'uz-fin-reviews-mirobi'
+app = 'uz-finance-reviews'
 primary_region = 'ams'
 
 [build]
 
 [env]
   DASHBOARD_PASSWORD = ''
-  DASHBOARD_READONLY = '1'
+  DASHBOARD_READONLY = '0'
+  AUTO_SYNC_HOURS = '3'
+  DATA_DIR = '/data'
+  TELEGRAM_LOOKBACK_HOURS = '48'
+
+[mounts]
+  source = 'reviews_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8000
   force_https = true
-  # Free-tier friendly: sleep when idle, wake on request
-  auto_stop_machines = 'stop'
+  # Stay up so the 3h auto-sync loop actually runs
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
   [[http_service.checks]]
@@ -31,4 +38,3 @@ primary_region = 'ams'
   memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
-

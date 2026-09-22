@@ -51,11 +51,10 @@ Or double-click:
 
 `scripts/open-deploy-terminal.command`
 
-3. A browser opens for **Fly.io login / free signup**.
-4. When deploy finishes you get:
+3. A browser opens for **Fly.io login** (card required).
+4. Live URL:
 
-`https://uz-finance-reviews.fly.dev`  
-(or a unique name if that one is taken)
+**https://uz-finance-reviews.fly.dev**
 
 **Defaults on Fly**
 - No password (open for colleagues)

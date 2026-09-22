@@ -7,7 +7,7 @@ import traceback
 from typing import Any
 
 from backend import db
-from backend.scrapers import appstore, play
+from backend.scrapers import appstore, huawei, play, xiaomi
 
 
 def sync_all(
@@ -28,6 +28,8 @@ def sync_all(
         "apps_failed": 0,
         "play_reviews": 0,
         "ios_reviews": 0,
+        "huawei_reviews": 0,
+        "xiaomi_reviews": 0,
         "errors": [],
     }
 
@@ -41,6 +43,7 @@ def sync_all(
             try:
                 icon_url = None
                 meta_blob: dict[str, Any] = {}
+                existing = db.get_app(slug) or {}
 
                 if app.get("play_id"):
                     try:
@@ -103,6 +106,46 @@ def sync_all(
                     except Exception as exc:
                         stats["errors"].append(f"{slug}/ios: {exc}")
 
+                huawei_id = app.get("huawei_id") or existing.get("huawei_id")
+                if not huawei_id:
+                    try:
+                        huawei_id = huawei.search_app(
+                            app.get("play_id") or app["name"],
+                            package=app.get("play_id"),
+                            name=app["name"],
+                        )
+                        if huawei_id:
+                            db.update_app_meta(slug, huawei_id=huawei_id)
+                    except Exception as exc:
+                        stats["errors"].append(f"{slug}/huawei-search: {exc}")
+                if huawei_id:
+                    try:
+                        hmeta = huawei.fetch_huawei_meta(huawei_id)
+                        icon_url = icon_url or hmeta.get("icon_url")
+                        meta_blob["huawei"] = hmeta.get("meta") or {}
+                        db.update_app_meta(slug, huawei_id=huawei_id, huawei_rating=hmeta.get("huawei_rating"))
+                        hreviews = huawei.fetch_huawei_reviews(huawei_id, slug)
+                        db.upsert_reviews(hreviews)
+                        stats["huawei_reviews"] += len(hreviews)
+                    except Exception as ext:
+                        stats["errors"].append(f"{slug}/huawei: {ext}")
+
+                xiaomi_pkg = app.get("xiaomi_id") or app.get("play_id")
+                if xiaomi_pkg:
+                    try:
+                        xmeta = xiaomi.fetch_xiaomi_meta(xiaomi_pkg)
+                        meta_blob["xiaomi"] = xmeta.get("meta") or {}
+                        db.update_app_meta(
+                            slug,
+                            xiaomi_id=xiaomi_pkg,
+                            xiaomi_rating=xmeta.get("xiaomi_rating"),
+                        )
+                        xreviews = xiaomi.fetch_xiaomi_reviews(xiaomi_pkg, slug)
+                        db.upsert_reviews(xreviews)
+                        stats["xiaomi_reviews"] += len(xreviews)
+                    except Exception as exc:
+                        stats["errors"].append(f"{slug}/xiaomi: {exc}")
+
                 db.update_app_meta(
                     slug,
                     icon_url=icon_url,
@@ -113,6 +156,14 @@ def sync_all(
             except Exception as exc:
                 stats["apps_failed"] += 1
                 stats["errors"].append(f"{slug}: {exc}")
+
+        try:
+            from backend import notify
+
+            stats["telegram"] = notify.notify_new_reviews()
+        except Exception as exc:
+            stats["errors"].append(f"telegram: {exc}")
+            stats["telegram"] = {"failed": 1, "errors": [str(exc)]}
 
         db.finish_sync_run(run_id, status="ok", stats=stats)
         stats["run_id"] = run_id

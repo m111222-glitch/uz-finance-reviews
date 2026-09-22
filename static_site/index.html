@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/assets/styles.css" />
+  <link rel="stylesheet" href="./assets/styles.css" />
 </head>
 <body>
   <div class="app">
@@ -22,27 +22,27 @@
       </div>
 
       <nav class="nav">
-        <button class="nav-item active" data-view="reviews">Reviews</button>
-        <button class="nav-item" data-view="overview">Overview</button>
+        <button class="nav-item active" data-view="overview">Overview</button>
         <button class="nav-item" data-view="apps">Apps</button>
+        <button class="nav-item" data-view="reviews">Reviews</button>
         <button class="nav-item" data-view="themes">Themes</button>
       </nav>
 
       <div class="sidebar-footer">
         <div class="sync-box">
-          <div class="sync-label">Auto-sync</div>
-          <div id="syncStatus" class="sync-status">every 3h</div>
-          <button id="syncBtn" class="btn btn-primary btn-block">Sync now</button>
+          <div class="sync-label">Hosting</div>
+          <div id="syncStatus" class="sync-status">static snapshot</div>
+          <button id="syncBtn" class="btn btn-primary btn-block" disabled>Read-only Pages</button>
         </div>
-        <p class="muted tiny">Play Store (UZ) + App Store RSS · finance apps catalog</p>
+        <p class="muted tiny">Permanent GitHub Pages · UZ finance store reviews</p>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div>
-          <h1 id="pageTitle">Reviews</h1>
-          <p class="muted" id="pageSub">Browse and filter scraped store reviews</p>
+          <h1 id="pageTitle">Overview</h1>
+          <p class="muted" id="pageSub">Ratings & reviews for UZ finance category leaders</p>
         </div>
         <div class="top-actions">
           <div class="pill" id="lastSyncPill">Never synced</div>
@@ -50,7 +50,7 @@
       </header>
 
       <!-- OVERVIEW -->
-      <section id="view-overview" class="view">
+      <section id="view-overview" class="view active">
         <div class="kpi-grid" id="kpiGrid"></div>
 
         <div class="grid-2">
@@ -110,15 +110,13 @@
       </section>
 
       <!-- REVIEWS -->
-      <section id="view-reviews" class="view active">
+      <section id="view-reviews" class="view">
         <div class="filters filters-row">
           <select id="filterApp"><option value="">All apps</option></select>
           <select id="filterStore">
             <option value="">All stores</option>
             <option value="play">Play Store</option>
             <option value="ios">App Store</option>
-            <option value="huawei">Huawei AppGallery</option>
-            <option value="xiaomi">Xiaomi GetApps</option>
           </select>
           <select id="filterRating">
             <option value="">All ratings</option>
@@ -182,6 +180,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/assets/app.js"></script>
+  <script src="./assets/app.js"></script>
 </body>
 </html>

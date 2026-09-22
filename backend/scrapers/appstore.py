@@ -15,6 +15,17 @@ RSS_CUSTOMER_REVIEWS = (
 )
 
 
+def _rss_label(node: Any) -> str | None:
+    if node is None:
+        return None
+    if isinstance(node, str):
+        return node
+    if isinstance(node, dict):
+        label = node.get("label")
+        return str(label) if label is not None else None
+    return str(node)
+
+
 def _iso_from_rss(value: str | None) -> str | None:
     if not value:
         return None
@@ -106,28 +117,27 @@ def fetch_ios_reviews(
                 if not entries:
                     break
 
-                # First entry is often the app metadata, skip non-review entries
+                if isinstance(entries, dict):
+                    entries = [entries]
+
                 for entry in entries:
-                    if "im:rating" not in entry and "im:rating" not in str(entry.keys()):
-                        # App Store RSS: reviews have im:rating
-                        rating_node = entry.get("im:rating")
-                        if not rating_node:
-                            continue
+                    if not isinstance(entry, dict):
+                        continue
                     rating_node = entry.get("im:rating")
                     if not rating_node:
                         continue
 
-                    review_id = (entry.get("id") or {}).get("label")
+                    review_id = _rss_label(entry.get("id"))
                     if not review_id or review_id in seen:
                         continue
                     seen.add(review_id)
 
-                    author = ((entry.get("author") or {}).get("name") or {}).get("label")
-                    title = (entry.get("title") or {}).get("label")
-                    body = (entry.get("content") or {}).get("label")
-                    version = (entry.get("im:version") or {}).get("label")
-                    rating_raw = (rating_node or {}).get("label")
-                    updated = (entry.get("updated") or {}).get("label")
+                    author = _rss_label(((entry.get("author") or {}) if isinstance(entry.get("author"), dict) else {}).get("name"))
+                    title = _rss_label(entry.get("title"))
+                    body = _rss_label(entry.get("content"))
+                    version = _rss_label(entry.get("im:version"))
+                    rating_raw = _rss_label(rating_node)
+                    updated = _rss_label(entry.get("updated"))
 
                     try:
                         rating = int(rating_raw) if rating_raw is not None else None
