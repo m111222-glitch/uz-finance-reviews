@@ -231,9 +231,18 @@
       "slug": "ipoteka-retail",
       "name": "Ipoteka Retail",
       "brand": "Ipoteka Bank",
-      "play_id": "com.bss.ipotekabank.retail.lite",
-      "ios_id": "1637057203",
-      "ios_bundle": "com.bss.ipotekabank.retail.lite"
+      "play_id": null,
+      "ios_id": null,
+      "ios_bundle": null,
+      "huawei_id": "C109188789"
+    },
+    {
+      "slug": "ipoteka-business",
+      "name": "Ipoteka Bank Electron",
+      "brand": "Ipoteka Bank",
+      "play_id": "uz.asbt.ipotekabank2.mobilebank.yur",
+      "ios_id": "1298501704",
+      "ios_bundle": "com.asbt.ipotekamobilefiz2"
     },
     {
       "slug": "mavrid",
