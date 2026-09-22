@@ -211,7 +211,7 @@ def format_message(review: dict[str, Any]) -> str:
     }.get(review.get("store") or "", review.get("store") or "Store")
     app = review.get("app_name") or review.get("app_slug") or "App"
     author = review.get("author") or "Anonymous"
-    date = (review.get("review_date") or review.get("scraped_at") or "")[:10]
+    date = _tashkent_date(review.get("review_date") or review.get("scraped_at"))
     version = review.get("version")
     title = (review.get("title") or "").strip()
     body = (review.get("body") or "").strip()
@@ -230,6 +230,18 @@ def format_message(review: dict[str, Any]) -> str:
     if hashtag:
         lines += ["", hashtag]
     return "\n".join(lines)
+
+
+def _tashkent_date(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value[:10]
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(TASHKENT).date().isoformat()
 
 
 def _esc(s: str) -> str:
