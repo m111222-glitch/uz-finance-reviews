@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 import threading
 from datetime import date
 from pathlib import Path
@@ -10,7 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -244,11 +246,30 @@ def trigger_sync(
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page() -> FileResponse:
+def login_page() -> HTMLResponse:
     path = FRONTEND / "login.html"
     if not path.exists():
         raise HTTPException(404, "Login page missing")
-    return FileResponse(path)
+    return _versioned_page(path)
+
+
+def _asset_version() -> str:
+    digest = hashlib.sha1()
+    for path in sorted((FRONTEND / "assets").glob("*")):
+        if path.is_file():
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
+# Copies cached before assets sent no-cache can outlive a deploy; a new URL
+# per asset build forces browsers to fetch the current app.js/styles.css.
+ASSET_VERSION = _asset_version() if (FRONTEND / "assets").exists() else ""
+ASSET_REF_RE = re.compile(r'(/assets/[\w.-]+\.(?:js|css))"')
+
+
+def _versioned_page(path: Path) -> HTMLResponse:
+    html = path.read_text(encoding="utf-8")
+    return HTMLResponse(ASSET_REF_RE.sub(rf'\1?v={ASSET_VERSION}"', html))
 
 
 # Static dashboard
@@ -257,8 +278,8 @@ if FRONTEND.exists():
 
 
 @app.get("/")
-def index() -> FileResponse:
+def index() -> HTMLResponse:
     index_path = FRONTEND / "index.html"
     if not index_path.exists():
         raise HTTPException(404, "Dashboard UI not found")
-    return FileResponse(index_path)
+    return _versioned_page(index_path)
