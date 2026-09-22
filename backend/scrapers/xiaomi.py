@@ -1,4 +1,33 @@
-"""Xiaomi GetApps scraper (best-effort public market endpoints)."""
+"""Xiaomi GetApps scraper.
+
+The private, device-authenticated GetApps/Mi Market API
+(``https://app.market.xiaomi.com/apm/search`` and
+``.../apm/comment/parentcommentlist``) rejects every request with
+``{"errDesc":"参数不合法","errCode":4}`` ("invalid parameters") regardless of
+the app queried -- verified against both the catalog apps below and a
+globally popular app (``com.whatsapp``). Those endpoints require a signed
+request (HMAC device signature tied to a MIUI device/account token) that
+Xiaomi does not publish; there is no legitimate way to derive it without
+proprietary device credentials, so we do not attempt it.
+
+Instead we scrape the public GetApps storefront page
+(``https://global.app.mi.com/details?id=<package>``), which is server-rendered
+(Nuxt.js) with the app's data embedded in a ``window.__NUXT__ = ...`` blob in
+the HTML. This gives us real, unauthenticated data: rating, install count,
+category, version, icon. Confirmed working against real catalog apps, e.g.
+``uz.dida.payme`` (payme, 4.2 rating) and
+``air.com.ssdsoftwaresolutions.clickuz`` (Click SuperApp, 4.3 rating). Not
+every app is listed on GetApps -- a package that isn't returns HTTP 404,
+which we treat as "no Xiaomi presence" rather than an error.
+
+Crucially, this storefront page only exposes the *aggregate* rating score --
+there is no individual review list, review text, author, or per-review date
+anywhere on it or in any endpoint it calls (checked the rendered page,
+network requests, and the page's own JS bundles for a comments/reviews API;
+none exists). So ``fetch_xiaomi_reviews`` always returns an empty list --
+that is expected, permanent behavior given what GetApps' public surface
+exposes, not a silent failure to be confused with a bug.
+"""
 
 from __future__ import annotations
 
@@ -9,149 +38,111 @@ from typing import Any
 
 import httpx
 
-# GetApps / Mi Market hosts that have historically exposed JSON
-SEARCH_URLS = [
-    "https://app.market.xiaomi.com/apm/search",
-]
-COMMENT_URLS = [
-    "https://app.market.xiaomi.com/apm/comment/parentcommentlist",
-    "https://app.market.xiaomi.com/apm/comment/parentCommentList",
-]
+DETAILS_URL = "https://global.app.mi.com/details"
 
-DEVICE = {
-    "os": "1",
-    "sdk": "33",
-    "la": "ru",
-    "co": "UZ",
-    "ua": "POCO F5",
-    "deviceType": "0",
-    "version": "40001000",
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml",
 }
+
+# The GetApps storefront only serves a handful of UI languages; "ru" 404s
+# even for apps that otherwise exist there, but "en" is reliably supported
+# and the fields we scrape (rating, counts, category) aren't language
+# dependent, so we always request it in English.
+LANG = "en"
+
+_STR_ESCAPE_RE = re.compile(r"\\u([0-9a-fA-F]{4})|\\(.)")
+
+
+def _js_unescape(s: str) -> str:
+    def repl(m: re.Match) -> str:
+        if m.group(1):
+            return chr(int(m.group(1), 16))
+        ch = m.group(2)
+        return {'"': '"', "\\": "\\", "n": "\n", "t": "\t", "r": "\r", "/": "/"}.get(ch, ch)
+
+    return _STR_ESCAPE_RE.sub(repl, s)
+
+
+def _extract_str(html: str, key: str) -> str | None:
+    m = re.search(rf'{re.escape(key)}:"((?:\\.|[^"\\])*)"', html)
+    return _js_unescape(m.group(1)) if m else None
+
+
+def _extract_num(html: str, key: str) -> float | None:
+    m = re.search(rf"{re.escape(key)}:(-?\d+(?:\.\d+)?)", html)
+    return float(m.group(1)) if m else None
+
+
+def _extract_rating(html: str) -> float | None:
+    raw = _extract_str(html, "ratingScoreJson")
+    if not raw:
+        return _extract_num(html, "ratingScore")
+    try:
+        scores = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(scores, dict) or not scores:
+        return None
+    values = [v for v in scores.values() if isinstance(v, (int, float))]
+    return float(values[0]) if values else None
 
 
 def _iso_ms(value: Any) -> str | None:
     if value is None:
         return None
     try:
-        n = int(value)
+        n = float(value)
         if n > 10_000_000_000:
             n = n / 1000
         return datetime.fromtimestamp(n, tz=timezone.utc).isoformat()
     except (TypeError, ValueError, OSError):
-        return str(value)
+        return None
 
 
-def fetch_xiaomi_meta(package: str) -> dict[str, Any]:
-    headers = {
-        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 13; 2201117TY MIUI/V14)",
-        "Accept": "application/json",
-    }
-    with httpx.Client(timeout=25.0, follow_redirects=True, headers=headers) as client:
-        r = client.get(SEARCH_URLS[0], params={**DEVICE, "keywords": package, "page": 0})
+def fetch_xiaomi_meta(package: str, *, country: str = "uz") -> dict[str, Any]:
+    params = {"id": package, "lo": country.upper(), "la": LANG}
+    with httpx.Client(timeout=25.0, follow_redirects=True, headers=HEADERS) as client:
+        r = client.get(DETAILS_URL, params=params)
+        if r.status_code == 404:
+            return {"xiaomi_rating": None, "meta": {"package": package, "error": "not_found"}}
         if r.status_code != 200:
-            return {"xiaomi_rating": None, "meta": {"package": package, "error": r.text[:200]}}
-        try:
-            data = r.json()
-        except Exception:
-            return {"xiaomi_rating": None, "meta": {"package": package}}
-    apps = (
-        data.get("listApp")
-        or data.get("list")
-        or data.get("data")
-        or data.get("appList")
-        or []
-    )
-    hit = None
-    for item in apps:
-        if not isinstance(item, dict):
-            continue
-        if (item.get("packageName") or item.get("package") or "") == package:
-            hit = item
-            break
-    if not hit and apps:
-        hit = apps[0] if isinstance(apps[0], dict) else None
-    if not hit:
-        return {"xiaomi_rating": None, "meta": {"package": package}}
-    rating = hit.get("ratingScore") or hit.get("score") or hit.get("star")
-    try:
-        rating_f = float(rating) if rating is not None else None
-    except (TypeError, ValueError):
-        rating_f = None
+            return {
+                "xiaomi_rating": None,
+                "meta": {"package": package, "error": f"http_{r.status_code}"},
+            }
+        html = r.text
+
+    if _extract_str(html, "packageName") != package:
+        # Storefront fell back to a generic/home page instead of the app.
+        return {"xiaomi_rating": None, "meta": {"package": package, "error": "not_found"}}
+
+    icon_path = _extract_str(html, "icon")
+    thumbnail_base = _extract_str(html, "thumbnail")
+    icon_url = f"{thumbnail_base}{icon_path}" if icon_path and thumbnail_base else None
+
     return {
-        "xiaomi_rating": rating_f,
-        "icon_url": hit.get("icon") or hit.get("iconUrl"),
+        "xiaomi_rating": _extract_rating(html),
+        "icon_url": icon_url,
         "meta": {
-            "title": hit.get("displayName") or hit.get("name"),
+            "title": _extract_str(html, "displayName"),
             "package": package,
-            "appId": hit.get("appId") or hit.get("id"),
-            "version": hit.get("versionName"),
+            "developer": _extract_str(html, "developerName") or _extract_str(html, "publisherName"),
+            "version": _extract_str(html, "versionName"),
+            "category": _extract_str(html, "level1CategoryName"),
+            "install_count": _extract_num(html, "downloadCount"),
+            "apk_size_bytes": _extract_num(html, "apkSize"),
+            "updated_at": _iso_ms(_extract_num(html, "updateTime")),
         },
     }
 
 
 def fetch_xiaomi_reviews(package: str, app_slug: str, *, count: int = 80) -> list[dict[str, Any]]:
-    scraped_at = datetime.now(timezone.utc).isoformat()
-    headers = {
-        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 13; 2201117TY MIUI/V14)",
-        "Accept": "application/json",
-    }
-    comments: list[dict[str, Any]] = []
-    with httpx.Client(timeout=25.0, follow_redirects=True, headers=headers) as client:
-        for url in COMMENT_URLS:
-            try:
-                r = client.get(
-                    url,
-                    params={
-                        **DEVICE,
-                        "packageName": package,
-                        "page": 0,
-                        "pageIndex": 0,
-                        "n": min(count, 50),
-                    },
-                )
-            except Exception:
-                continue
-            if r.status_code != 200 or "json" not in (r.headers.get("content-type") or ""):
-                continue
-            try:
-                data = r.json()
-            except Exception:
-                continue
-            lst = (
-                data.get("list")
-                or data.get("comments")
-                or data.get("commentList")
-                or (data.get("data") or {}).get("list")
-                or []
-            )
-            if isinstance(lst, list) and lst:
-                comments = [x for x in lst if isinstance(x, dict)]
-                break
-    rows: list[dict[str, Any]] = []
-    for i, item in enumerate(comments[:count]):
-        body = (item.get("comment") or item.get("content") or item.get("text") or "").strip()
-        if not body:
-            continue
-        cid = item.get("commentId") or item.get("id") or f"{package}:{i}:{body[:30]}"
-        try:
-            rating = int(float(item.get("score") or item.get("star") or item.get("rating") or 0))
-        except (TypeError, ValueError):
-            rating = None
-        rows.append(
-            {
-                "id": f"xiaomi:{cid}",
-                "app_slug": app_slug,
-                "store": "xiaomi",
-                "author": item.get("nickname") or item.get("userName") or "Anonymous",
-                "rating": rating if rating and 1 <= rating <= 5 else None,
-                "title": item.get("title"),
-                "body": body,
-                "language": "ru",
-                "version": item.get("versionName") or item.get("version"),
-                "thumbs_up": int(item.get("likeCount") or item.get("likes") or 0),
-                "review_date": _iso_ms(item.get("updateTime") or item.get("createTime") or item.get("time")),
-                "scraped_at": scraped_at,
-                "raw_json": json.dumps(item, ensure_ascii=False, default=str),
-            }
-        )
-    return rows
+    """Always returns [] -- see module docstring: GetApps' public storefront
+    exposes only an aggregate rating, never individual review text, and the
+    private review API is unreachable without a proprietary device signature.
+    """
+    return []
