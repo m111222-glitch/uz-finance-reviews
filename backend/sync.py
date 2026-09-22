@@ -65,20 +65,27 @@ def sync_all(
                             lang=lang,
                             count=play_review_count,
                         )
-                        # Also try uz language for more coverage
-                        if lang != "uz":
-                            previews_uz = play.fetch_play_reviews(
-                                app["play_id"],
-                                slug,
-                                country=country,
-                                lang="uz",
-                                count=min(80, play_review_count),
-                            )
-                            seen = {r["id"] for r in previews}
-                            for r in previews_uz:
+                        # Play only returns reviews matching the requested language
+                        seen = {r["id"] for r in previews}
+                        for extra_lang in ("uz", "en"):
+                            if extra_lang == lang:
+                                continue
+                            try:
+                                extra = play.fetch_play_reviews(
+                                    app["play_id"],
+                                    slug,
+                                    country=country,
+                                    lang=extra_lang,
+                                    count=min(80, play_review_count),
+                                )
+                            except Exception as exc:
+                                stats["errors"].append(f"{slug}/play-{extra_lang}: {exc}")
+                                continue
+                            for r in extra:
                                 if r["id"] not in seen:
+                                    seen.add(r["id"])
                                     previews.append(r)
-                        n = db.upsert_reviews(previews)
+                        db.upsert_reviews(previews)
                         stats["play_reviews"] += len(previews)
                     except Exception as exc:
                         stats["errors"].append(f"{slug}/play: {exc}")

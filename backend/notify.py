@@ -190,8 +190,13 @@ STAR_TAGS = {
     1: "1★ complaint",
 }
 
+APP_HASHTAGS = {"alif-mobi": "#Alif"}
+
 SUMMARY_APP_SLUGS = ("alif-mobi", "click", "payme", "paynet", "xazna", "uzum-bank")
 TASHKENT = timezone(timedelta(hours=5))
+# Store feeds publish reviews ~a day late (keeping the original timestamp), so
+# summarising yesterday right after midnight misses most of its reviews.
+SUMMARY_DAYS_BACK = 2
 
 
 def format_message(review: dict[str, Any]) -> str:
@@ -215,12 +220,15 @@ def format_message(review: dict[str, Any]) -> str:
         text = text[:1190] + "…"
 
     lines = [
-        f"{stars}  <b>{_esc(app)}</b> · {tag}",
+        f"<b>{_esc(app)}</b>  {stars} · {tag}",
         f"{store} · {_esc(author)} · {date}"
         + (f" · v{_esc(version)}" if version else ""),
         "",
         _esc(text),
     ]
+    hashtag = APP_HASHTAGS.get(review.get("app_slug") or "")
+    if hashtag:
+        lines += ["", hashtag]
     return "\n".join(lines)
 
 
@@ -308,14 +316,14 @@ THEME_LABELS = {
 }
 
 
-def tashkent_yesterday_range() -> tuple[str, str, str]:
+def tashkent_day_range(days_back: int = SUMMARY_DAYS_BACK) -> tuple[str, str, str]:
     now = datetime.now(TASHKENT)
-    yday = now.date() - timedelta(days=1)
-    start = datetime(yday.year, yday.month, yday.day, tzinfo=TASHKENT).astimezone(
+    day = now.date() - timedelta(days=days_back)
+    start = datetime(day.year, day.month, day.day, tzinfo=TASHKENT).astimezone(
         timezone.utc
     )
     end = start + timedelta(days=1)
-    return yday.isoformat(), start.isoformat(), end.isoformat()
+    return day.isoformat(), start.isoformat(), end.isoformat()
 
 
 def _complaint_sentence(reviews: list[dict[str, Any]]) -> str:
@@ -337,7 +345,7 @@ def _complaint_sentence(reviews: list[dict[str, Any]]) -> str:
 
 def format_daily_summary(day: str, by_slug: dict[str, list[dict[str, Any]]]) -> str:
     lines = [
-        f"📊 <b>Yesterday</b> · {day} (Tashkent)",
+        f"📊 <b>Daily recap</b> · {day} (Tashkent)",
         "Alif · Click · Payme · Paynet · Xazna · Uzum",
         "",
     ]
@@ -370,7 +378,7 @@ def format_daily_summary(day: str, by_slug: dict[str, list[dict[str, Any]]]) -> 
 
 
 def maybe_post_daily_summary(*, dry_run: bool = False) -> dict[str, Any]:
-    day, start_iso, end_iso = tashkent_yesterday_range()
+    day, start_iso, end_iso = tashkent_day_range()
     out: dict[str, Any] = {"day": day, "posted": False, "skipped": False}
     if db.summary_posted(day):
         out["skipped"] = True
@@ -412,7 +420,7 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
 
     # Post oldest first so the channel reads chronologically
     rows = list(reversed(rows))
-    max_per_run = int(os.getenv("TELEGRAM_MAX_PER_RUN", "15"))
+    max_per_run = int(os.getenv("TELEGRAM_MAX_PER_RUN", "30"))
     for review in rows:
         if not has_context(review):
             stats["skipped_short"] += 1
@@ -427,7 +435,7 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
             send_message(format_message(review))
             db.mark_telegram_posted(review["id"], review.get("rating"))
             stats["posted"] += 1
-            time.sleep(1.2)  # ~1 msg/sec — Telegram flood control
+            time.sleep(3.1)  # Telegram allows ~20 msgs/min to one chat
         except Exception as exc:
             stats["errors"].append(f"{review.get('id')}: {_redact(str(exc))}")
             stats["failed"] += 1
