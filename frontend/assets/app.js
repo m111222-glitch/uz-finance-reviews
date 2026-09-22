@@ -362,30 +362,37 @@ const STORE_ID_FIELD = { play: "play_id", ios: "ios_id", huawei: "huawei_id", xi
 
 const rating2 = (v) => (v != null ? Number(v).toFixed(2) : "—");
 
-function appMetrics(a, store) {
+// Store ratings are the stores' all-time figures; review counts/average follow the period
+function appMetrics(a, store, inPeriod) {
+  const reviews = (label, n) => [inPeriod ? "Reviews in period" : label, fmt(n, 0), true];
+  const periodAvg = inPeriod ? [["Avg ★ in period", rating2(a.avg_review_rating)]] : [];
   switch (store) {
     case "play":
       return [
         ["Play rating", rating2(a.play_rating)],
         ["Play ratings #", fmt(a.play_ratings_count, 0), true],
         ["Installs", escapeHtml(a.play_installs || "—"), true],
-        ["Play reviews", fmt(a.play_review_count, 0), true],
+        reviews("Play reviews", a.play_review_count),
+        ...periodAvg,
       ];
     case "ios":
       return [
         ["iOS rating", rating2(a.ios_rating)],
         ["iOS ratings #", fmt(a.ios_ratings_count, 0), true],
-        ["iOS reviews", fmt(a.ios_review_count, 0), true],
+        reviews("iOS reviews", a.ios_review_count),
+        ...periodAvg,
       ];
     case "huawei":
       return [
         ["Huawei rating", rating2(a.huawei_rating)],
-        ["Huawei reviews", fmt(a.huawei_review_count, 0), true],
+        reviews("Huawei reviews", a.huawei_review_count),
+        ...periodAvg,
       ];
     case "xiaomi":
       return [
         ["Xiaomi rating", rating2(a.xiaomi_rating)],
-        ["Xiaomi reviews", fmt(a.xiaomi_review_count, 0), true],
+        reviews("Xiaomi reviews", a.xiaomi_review_count),
+        ...periodAvg,
       ];
     default:
       return [
@@ -394,15 +401,26 @@ function appMetrics(a, store) {
         ["Play ratings #", fmt(a.play_ratings_count, 0), true],
         ["iOS ratings #", fmt(a.ios_ratings_count, 0), true],
         ["Installs", escapeHtml(a.play_installs || "—"), true],
-        ["Scraped reviews", fmt(a.review_count, 0), true],
+        reviews("Scraped reviews", a.review_count),
+        ...periodAvg,
       ];
   }
+}
+
+async function loadApps() {
+  const params = filterParams("ap");
+  params.delete("app");
+  const apps = await latest("apps", `/api/apps?${params}`);
+  if (!apps) return;
+  state.apps = apps;
+  renderApps(apps);
 }
 
 function renderApps(apps) {
   const q = ($("#appSearch").value || "").toLowerCase();
   const slug = $("#apApp").value;
   const store = $("#apStore").value;
+  const inPeriod = periodRange("ap").some(Boolean);
   const filtered = apps.filter(
     (a) =>
       (!slug || a.slug === slug) &&
@@ -418,7 +436,7 @@ function renderApps(apps) {
       const icon = a.icon_url
         ? `<img class="app-icon" src="${escapeHtml(a.icon_url)}" alt="" />`
         : `<div class="app-icon"></div>`;
-      const metrics = appMetrics(a, store)
+      const metrics = appMetrics(a, store, inPeriod)
         .map(([k, v, mono]) => `<div class="metric"><div class="k">${k}</div><div class="v${mono ? " mono" : ""}">${v}</div></div>`)
         .join("");
       return `<article class="app-card">
@@ -528,9 +546,8 @@ async function applyShareMode() {
 
 async function refreshAll() {
   chartDefaults();
-  state.apps = await api("/api/apps");
+  await loadApps();
   fillAppFilters(state.apps);
-  renderApps(state.apps);
   await Promise.all([loadOverview(), loadThemes()]);
 }
 
@@ -605,9 +622,9 @@ function wire() {
   );
   $("#syncBtn").addEventListener("click", startSync);
   $("#appSearch").addEventListener("input", () => renderApps(state.apps));
-  ["#apApp", "#apStore"].forEach((sel) =>
-    $(sel).addEventListener("change", () => renderApps(state.apps))
-  );
+  $("#apApp").addEventListener("change", () => renderApps(state.apps));
+  $("#apStore").addEventListener("change", () => loadApps().catch((e) => toast(e.message)));
+  wirePeriod("ap", () => loadApps().catch((e) => toast(e.message)));
   ["#ovApp", "#ovStore"].forEach((sel) =>
     $(sel).addEventListener("change", () => loadOverview().catch((e) => toast(e.message)))
   );

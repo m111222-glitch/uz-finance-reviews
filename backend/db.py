@@ -273,20 +273,33 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
     return inserted
 
 
-def get_apps() -> list[dict[str, Any]]:
+def get_apps(
+    *,
+    store: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> list[dict[str, Any]]:
+    """Every app, with review counts/average limited to the date range (and store, for the average)."""
+    date_sql, date_params = _date_clauses(date_from, date_to)
+    join_extra = "".join(f" AND {c}" for c in date_sql)
+    avg_sql = "AVG(CASE WHEN r.store = ? THEN r.rating END)" if store else "AVG(r.rating)"
+    params = ([store] if store else []) + date_params
     with connect() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT a.*,
-                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug) AS review_count,
-                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'play') AS play_review_count,
-                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'ios') AS ios_review_count,
-                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'huawei') AS huawei_review_count,
-                (SELECT COUNT(*) FROM reviews r WHERE r.app_slug = a.slug AND r.store = 'xiaomi') AS xiaomi_review_count,
-                (SELECT AVG(rating) FROM reviews r WHERE r.app_slug = a.slug) AS avg_review_rating
+                COUNT(r.id) AS review_count,
+                SUM(CASE WHEN r.store = 'play' THEN 1 ELSE 0 END) AS play_review_count,
+                SUM(CASE WHEN r.store = 'ios' THEN 1 ELSE 0 END) AS ios_review_count,
+                SUM(CASE WHEN r.store = 'huawei' THEN 1 ELSE 0 END) AS huawei_review_count,
+                SUM(CASE WHEN r.store = 'xiaomi' THEN 1 ELSE 0 END) AS xiaomi_review_count,
+                {avg_sql} AS avg_review_rating
             FROM apps a
+            LEFT JOIN reviews r ON r.app_slug = a.slug{join_extra}
+            GROUP BY a.slug
             ORDER BY a.name COLLATE NOCASE
-            """
+            """,
+            params,
         ).fetchall()
         return [dict(row) for row in rows]
 

@@ -144,8 +144,12 @@ def dashboard(
 
 
 @app.get("/api/apps")
-def list_apps() -> list[dict[str, Any]]:
-    return db.get_apps()
+def list_apps(
+    store: str | None = Query(None, pattern="^(play|ios|huawei|xiaomi)$"),
+    date_from: date | None = Query(None, description="Tashkent date, inclusive"),
+    date_to: date | None = Query(None, description="Tashkent date, inclusive"),
+) -> list[dict[str, Any]]:
+    return db.get_apps(store=store, date_from=date_from, date_to=date_to)
 
 
 @app.get("/api/apps/{slug}")
