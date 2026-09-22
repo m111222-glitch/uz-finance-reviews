@@ -44,7 +44,9 @@ def _get(client: httpx.Client, **params: Any) -> dict[str, Any]:
         "method": "internal.getTabDetail",
         "serviceType": "20",
         "locale": "ru_RU",
-        "zone": "",
+        # Without an explicit zone AppGallery answers for the caller's IP region,
+        # which on the (EU-hosted) server hides Uzbekistan ratings and reviews
+        "zone": "UZ",
         "reqPageNum": "1",
         "maxResults": "25",
     }
