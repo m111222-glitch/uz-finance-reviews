@@ -158,6 +158,8 @@ a { color: var(--primary); }
   grid-template-columns: 1fr 1fr 1fr;
   gap: 14px;
 }
+/* Chart canvases keep their drawn width; without this the grid can't shrink them */
+.grid-2 > *, .grid-3 > * { min-width: 0; }
 
 .card {
   background: var(--bg-card);

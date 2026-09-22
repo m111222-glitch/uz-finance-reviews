@@ -35,6 +35,16 @@ app.add_middleware(
 )
 app.add_middleware(auth.PasswordGateMiddleware)
 
+
+@app.middleware("http")
+async def revalidate_frontend(request: Request, call_next):
+    # Without this, browsers may pair a fresh index.html with a stale app.js after a deploy
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path == "/login" or path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 _sync_lock = threading.Lock()
 _sync_state: dict[str, Any] = {"running": False, "last_result": None}
 
