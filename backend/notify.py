@@ -315,17 +315,31 @@ def preview_candidates(limit: int = 20) -> list[dict[str, Any]]:
 
 
 THEME_LABELS = {
-    "payments": "payments / transfers",
-    "cards": "cards",
-    "cashback": "cashback",
-    "support": "support",
-    "login_auth": "login / SMS / PIN",
-    "crashes": "crashes / app not working",
-    "updates": "updates",
-    "loans_credit": "loans / nasiya",
-    "fees": "fees / commissions",
-    "ui_ux": "UI / UX",
+    "payments": "платежи и переводы",
+    "cards": "банковские карты",
+    "cashback": "кешбэк",
+    "support": "служба поддержки",
+    "login_auth": "вход, SMS и PIN-код",
+    "crashes": "сбои в работе приложения",
+    "updates": "обновления",
+    "loans_credit": "кредиты и рассрочка",
+    "fees": "комиссии",
+    "ui_ux": "интерфейс и удобство",
 }
+
+SUMMARY_APP_NAMES = {
+    "alif-mobi": "Alif Mobi",
+    "click": "Click",
+    "payme": "Payme",
+    "paynet": "Paynet",
+    "xazna": "Xazna",
+    "uzum-bank": "Uzum Bank",
+}
+
+RU_MONTHS = (
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+)
 
 
 def tashkent_day_range(days_back: int = SUMMARY_DAYS_BACK) -> tuple[str, str, str]:
@@ -338,7 +352,19 @@ def tashkent_day_range(days_back: int = SUMMARY_DAYS_BACK) -> tuple[str, str, st
     return day.isoformat(), start.isoformat(), end.isoformat()
 
 
-def _complaint_sentence(reviews: list[dict[str, Any]]) -> str:
+def _ru_plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(n) % 100
+    if 11 <= n <= 14:
+        return many
+    n %= 10
+    if n == 1:
+        return one
+    if 2 <= n <= 4:
+        return few
+    return many
+
+
+def _complaint_lines(reviews: list[dict[str, Any]]) -> list[str]:
     from backend.analytics import extract_themes
 
     neg_texts = [
@@ -347,45 +373,69 @@ def _complaint_sentence(reviews: list[dict[str, Any]]) -> str:
         if (r.get("rating") or 5) <= 2 and (r.get("body") or "").strip()
     ]
     if not neg_texts:
-        return "No notable complaints."
+        return ["Основные жалобы: нет"]
     themes = extract_themes(neg_texts)
     if not themes:
-        return "Complaints were mixed."
-    labels = [THEME_LABELS.get(t["theme"], t["theme"]) for t in themes[:3]]
-    return "Complaints: " + ", ".join(labels) + "."
+        return ["Основные жалобы: разные темы"]
+    return ["Основные жалобы:"] + [
+        f"• {THEME_LABELS.get(t['theme'], t['theme'])}" for t in themes[:3]
+    ]
+
+
+def _rating_marker(avg: float) -> str:
+    if avg > 4.0:
+        return "🟢"
+    if avg >= 3.0:
+        return "🟡"
+    return "🔴"
 
 
 def format_daily_summary(day: str, by_slug: dict[str, list[dict[str, Any]]]) -> str:
+    d = datetime.fromisoformat(day).date()
+    apps = []
+    for slug in SUMMARY_APP_SLUGS:
+        rows = [r for r in by_slug.get(slug) or [] if r.get("rating") in (1, 2, 3, 4, 5)]
+        counts = {n: sum(1 for r in rows if r["rating"] == n) for n in range(1, 6)}
+        avg = sum(n * c for n, c in counts.items()) / len(rows) if rows else None
+        apps.append({
+            "name": SUMMARY_APP_NAMES.get(slug, slug),
+            "rows": rows,
+            "counts": counts,
+            "avg": avg,
+            "negatives": counts[1] + counts[2],
+        })
+    # Highest average first; apps with no reviews that day go last
+    apps.sort(key=lambda a: (a["avg"] is None, -(a["avg"] or 0), -len(a["rows"])))
+
     lines = [
-        f"📊 <b>Daily recap</b> · {day} (Tashkent)",
-        "Alif · Click · Payme · Paynet · Xazna · Uzum",
+        "📊 <b>Ежедневный обзор отзывов</b>",
+        f"{d.day} {RU_MONTHS[d.month - 1]} {d.year} · Ташкент",
+        "",
+        f"Всего новых отзывов: {sum(len(a['rows']) for a in apps)}",
         "",
     ]
-    names = {
-        "alif-mobi": "Alif Mobi",
-        "click": "Click",
-        "payme": "Payme",
-        "paynet": "Paynet",
-        "xazna": "Xazna",
-        "uzum-bank": "Uzum Bank",
-    }
-    for slug in SUMMARY_APP_SLUGS:
-        rows = by_slug.get(slug) or []
-        name = names.get(slug, slug)
-        counts = {n: 0 for n in range(1, 6)}
-        for r in rows:
-            try:
-                star = int(r.get("rating") or 0)
-            except (TypeError, ValueError):
-                continue
-            if 1 <= star <= 5:
-                counts[star] += 1
-        total = sum(counts.values())
-        dist = " · ".join(f"{n}★ {counts[n]}" for n in range(1, 6))
-        lines.append(f"<b>{_esc(name)}</b> — {total} reviews")
-        lines.append(dist)
-        lines.append(_esc(_complaint_sentence(rows)))
-        lines.append("")
+    for a in apps:
+        name = _esc(a["name"])
+        if a["avg"] is None:
+            lines += [f"⚪ <b>{name}</b> — нет отзывов", ""]
+            continue
+        n = len(a["rows"])
+        score = f"{a['avg']:.2f}".replace(".", ",")
+        lines += [
+            f"{_rating_marker(a['avg'])} <b>{name}</b> — {score} ★",
+            f"{n} {_ru_plural(n, 'отзыв', 'отзыва', 'отзывов')} · негативных: {a['negatives']}",
+            *_complaint_lines(a["rows"]),
+            "",
+        ]
+
+    lines += ["━━━━━━━━━━━━━━", "", "⭐ Распределение оценок", ""]
+    for a in apps:
+        if a["avg"] is None:
+            continue
+        dist = " · ".join(
+            f"{'★' * star} {a['counts'][star]}" for star in range(5, 0, -1) if a["counts"][star]
+        )
+        lines += [_esc(a["name"]), dist, ""]
     return "\n".join(lines).strip()
 
 
