@@ -296,6 +296,7 @@ function reviewCard(r) {
       <span>${escapeHtml(r.author || "Anonymous")}</span>
       <span class="mono">${escapeHtml(date)}</span>
       ${r.version ? `<span class="mono">v${escapeHtml(r.version)}</span>` : ""}
+      ${r.console_url ? `<a class="review-link" href="${escapeHtml(r.console_url)}" target="_blank" rel="noopener">Open in Play Console ↗</a>` : ""}
     </div>
     ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ""}
     <div class="review-body">${escapeHtml(r.body || "")}</div>
@@ -537,11 +538,7 @@ function updateSyncPill(d) {
 async function applyShareMode() {
   try {
     const st = await api("/api/auth/status");
-    const btn = $("#syncBtn");
     if (st.readonly) {
-      btn.disabled = true;
-      btn.textContent = "Read-only share";
-      btn.title = "Sync is disabled on this shared view";
       const pill = $("#lastSyncPill");
       if (pill && !pill.textContent.includes("read-only")) {
         pill.textContent = (pill.textContent || "") + " · read-only";
@@ -573,15 +570,10 @@ function formatAutoSync(st) {
 async function pollSync() {
   try {
     const st = await api("/api/sync/status");
-    const btn = $("#syncBtn");
     if (st.running) {
-      btn.disabled = true;
-      btn.textContent = "Syncing…";
       $("#syncStatus").textContent = "running…";
       setTimeout(pollSync, 2500);
     } else {
-      btn.disabled = false;
-      btn.textContent = "Sync now";
       $("#syncStatus").textContent = formatAutoSync(st);
     }
   } catch {
@@ -589,46 +581,10 @@ async function pollSync() {
   }
 }
 
-async function startSync() {
-  const btn = $("#syncBtn");
-  btn.disabled = true;
-  btn.textContent = "Starting…";
-  try {
-    const res = await api("/api/sync?background=true", { method: "POST" });
-    if (res.status === "already_running") toast("Sync already running");
-    else toast("Sync started — fetching Play + App Store…");
-    pollSync();
-    // Refresh when done
-    const wait = async () => {
-      const st = await api("/api/sync/status");
-      if (st.running) {
-        setTimeout(wait, 3000);
-      } else {
-        await refreshAll();
-        await loadReviews();
-        if (st.last_result?.status === "ok") {
-          toast(
-            `Synced: Play ${st.last_result.play_reviews || 0} · iOS ${st.last_result.ios_reviews || 0}` +
-              ` · HW ${st.last_result.huawei_reviews || 0} · Mi ${st.last_result.xiaomi_reviews || 0}`
-          );
-        } else if (st.last_result?.status === "error") {
-          toast("Sync finished with errors — check API logs");
-        }
-      }
-    };
-    setTimeout(wait, 3000);
-  } catch (e) {
-    toast("Failed to start sync: " + e.message);
-    btn.disabled = false;
-    btn.textContent = "Sync now";
-  }
-}
-
 function wire() {
   $$(".nav-item").forEach((btn) =>
     btn.addEventListener("click", () => setView(btn.dataset.view))
   );
-  $("#syncBtn").addEventListener("click", startSync);
   $("#appSearch").addEventListener("input", () => renderApps(state.apps));
   $("#apApp").addEventListener("change", () => renderApps(state.apps));
   $("#apStore").addEventListener("change", () => loadApps().catch((e) => toast(e.message)));
