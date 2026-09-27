@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import quote
 
+from backend import geo
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
 DB_PATH = DATA_DIR / "reviews.db"
@@ -141,6 +143,7 @@ def init_db() -> None:
         # Only known for apps whose Play Console we can read via the Developer API
         for col in ("device", "device_class", "os_version"):
             _ensure_column(conn, "reviews", col, "TEXT")
+        _infer_missing_countries(conn)
 
 
 # One row per store build we've seen; release_key is the version, or the
@@ -187,6 +190,15 @@ def _migrate_app_releases(conn: sqlite3.Connection) -> None:
         DROP TABLE app_releases_old;
         """
     )
+
+
+def _infer_missing_countries(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        "SELECT id, body FROM reviews WHERE country IS NULL AND store != 'ios' AND body IS NOT NULL"
+    ).fetchall()
+    updates = [(c, rid) for rid, body in rows if (c := geo.infer_country(body))]
+    if updates:
+        conn.executemany("UPDATE reviews SET country = ? WHERE id = ?", updates)
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
@@ -355,7 +367,8 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
                     r.get("review_date"),
                     r.get("scraped_at") or utcnow(),
                     r.get("raw_json"),
-                    r.get("country"),
+                    r.get("country")
+                    or (None if r["store"] == "ios" else geo.infer_country(r.get("body"))),
                     r.get("device"),
                     r.get("device_class"),
                     r.get("os_version"),
