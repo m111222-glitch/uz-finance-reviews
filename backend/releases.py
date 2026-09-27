@@ -10,8 +10,8 @@ from typing import Any
 from backend import db, notify
 
 STORE_NAMES = {
-    "ios": "App Store",
-    "play": "Google Play",
+    "ios": "🍎 App Store",
+    "play": "🤖 Google Play",
     "huawei": "AppGallery",
 }
 
@@ -70,13 +70,47 @@ def extract(store: str, meta: dict[str, Any]) -> dict[str, Any] | None:
     return out if (out["version"] or out["released_at"]) else None
 
 
-def record_from_meta(slug: str, meta_blob: dict[str, Any]) -> int:
+def record_from_meta(
+    slug: str, meta_blob: dict[str, Any], *, app_name: str | None = None
+) -> int:
     new = 0
     for store, meta in meta_blob.items():
         rel = extract(store, meta or {})
-        if rel and db.record_release(slug, store, **rel):
+        if rel and db.record_release(slug, store, app_name=app_name, **rel):
             new += 1
     return new
+
+
+def sync_release_only_apps(
+    apps: list[dict[str, Any]], *, country: str, lang: str
+) -> dict[str, Any]:
+    """Shops etc. we follow for release notes only — no reviews, no dashboard row."""
+    from backend.scrapers import appstore, play
+
+    stats: dict[str, Any] = {"new_releases": 0, "errors": []}
+    for app in apps:
+        meta_blob: dict[str, Any] = {}
+        if app.get("play_id"):
+            try:
+                meta_blob["play"] = play.fetch_play_meta(
+                    app["play_id"], country=country, lang=lang
+                ).get("meta") or {}
+            except Exception as exc:
+                stats["errors"].append(f"{app['slug']}/play: {exc}")
+        if app.get("ios_id"):
+            try:
+                meta_blob["ios"] = appstore.fetch_ios_meta(
+                    app["ios_id"], country=country
+                ).get("meta") or {}
+            except Exception as exc:
+                stats["errors"].append(f"{app['slug']}/ios: {exc}")
+        try:
+            stats["new_releases"] += record_from_meta(
+                app["slug"], meta_blob, app_name=app["name"]
+            )
+        except Exception as exc:
+            stats["errors"].append(f"{app['slug']}/releases: {exc}")
+    return stats
 
 
 def _hashtag(slug: str) -> str:
@@ -85,7 +119,7 @@ def _hashtag(slug: str) -> str:
 
 
 def format_release(rel: dict[str, Any], *, same_notes_as: str | None = None) -> str:
-    app = rel.get("app_name") or rel["app_slug"]
+    app = rel.get("display_name") or rel.get("app_name") or rel["app_slug"]
     store = STORE_NAMES.get(rel["store"], rel["store"])
     version = rel.get("version")
     head = f"🚀 <b>{notify._esc(app)}</b>" + (f" {notify._esc(version)}" if version else "")
@@ -114,7 +148,7 @@ def post_new_releases(*, dry_run: bool = False) -> dict[str, Any]:
         if rel.get("version"):
             for other in db.posted_release_notes(rel["app_slug"], rel["version"]):
                 if other["store"] != rel["store"] and (other["notes"] or "") == (rel["notes"] or ""):
-                    same = STORE_NAMES.get(other["store"], other["store"])
+                    same = STORE_NAMES.get(other["store"], other["store"]).split(" ", 1)[-1]
                     break
         text = format_release(rel, same_notes_as=same)
         if dry_run:

@@ -121,23 +121,10 @@ def init_db() -> None:
                 payload_json TEXT
             );
 
-            -- One row per store build we've seen; release_key is the version, or
-            -- the listing's update time when the store hides it ("Varies with device").
-            CREATE TABLE IF NOT EXISTS app_releases (
-                app_slug TEXT NOT NULL,
-                store TEXT NOT NULL,
-                release_key TEXT NOT NULL,
-                version TEXT,
-                released_at TEXT,
-                notes TEXT,
-                first_seen_at TEXT NOT NULL,
-                posted_at TEXT,
-                PRIMARY KEY (app_slug, store, release_key),
-                FOREIGN KEY (app_slug) REFERENCES apps(slug)
-            );
             """
         )
         _migrate_reviews_store(conn)
+        _migrate_app_releases(conn)
         for col, decl in (
             ("huawei_id", "TEXT"),
             ("huawei_rating", "REAL"),
@@ -145,6 +132,52 @@ def init_db() -> None:
             ("xiaomi_rating", "REAL"),
         ):
             _ensure_column(conn, "apps", col, decl)
+
+
+# One row per store build we've seen; release_key is the version, or the
+# listing's update time when the store hides it ("Varies with device").
+# No FK to apps: release-only apps (shops) never get an apps row, so the
+# name is stored on the release itself.
+APP_RELEASES_SQL = """
+    CREATE TABLE IF NOT EXISTS app_releases (
+        app_slug TEXT NOT NULL,
+        app_name TEXT,
+        store TEXT NOT NULL,
+        release_key TEXT NOT NULL,
+        version TEXT,
+        released_at TEXT,
+        notes TEXT,
+        first_seen_at TEXT NOT NULL,
+        posted_at TEXT,
+        PRIMARY KEY (app_slug, store, release_key)
+    )
+"""
+
+
+def _migrate_app_releases(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='app_releases'"
+    ).fetchone()
+    if not row:
+        conn.execute(APP_RELEASES_SQL)
+        return
+    if "FOREIGN KEY" not in row[0]:
+        return
+    # First version referenced apps(slug); rebuild without it, keeping rows
+    conn.executescript(
+        f"""
+        ALTER TABLE app_releases RENAME TO app_releases_old;
+        {APP_RELEASES_SQL};
+        INSERT INTO app_releases (
+            app_slug, store, release_key, version, released_at, notes,
+            first_seen_at, posted_at
+        )
+        SELECT app_slug, store, release_key, version, released_at, notes,
+               first_seen_at, posted_at
+        FROM app_releases_old;
+        DROP TABLE app_releases_old;
+        """
+    )
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
@@ -596,6 +629,7 @@ def record_release(
     version: str | None,
     released_at: str | None,
     notes: str | None,
+    app_name: str | None = None,
     backfill_hours: float = 48.0,
 ) -> bool:
     """Store a build the first time a sync sees it; returns True if it's new.
@@ -620,11 +654,11 @@ def record_release(
         cur = conn.execute(
             """
             INSERT OR IGNORE INTO app_releases (
-                app_slug, store, release_key, version, released_at, notes,
-                first_seen_at, posted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                app_slug, app_name, store, release_key, version, released_at,
+                notes, first_seen_at, posted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (slug, store, key, version, released_at, notes, now, posted_at),
+            (slug, app_name, store, key, version, released_at, notes, now, posted_at),
         )
         return cur.rowcount > 0
 
@@ -633,9 +667,9 @@ def unposted_releases(limit: int = 50) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(
             """
-            SELECT r.*, a.name AS app_name
+            SELECT r.*, COALESCE(a.name, r.app_name) AS display_name
             FROM app_releases r
-            JOIN apps a ON a.slug = r.app_slug
+            LEFT JOIN apps a ON a.slug = r.app_slug
             WHERE r.posted_at IS NULL
             ORDER BY COALESCE(r.released_at, r.first_seen_at)
             LIMIT ?

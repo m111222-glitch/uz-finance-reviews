@@ -390,7 +390,7 @@ def _rating_marker(avg: float) -> str:
     return "🔴"
 
 
-RELEASE_STORE_NAMES = {"ios": "App Store", "play": "Google Play", "huawei": "AppGallery"}
+RELEASE_STORE_NAMES = {"ios": "🍎 App Store", "play": "🤖 Google Play", "huawei": "AppGallery"}
 MIN_REVIEWS_FOR_SHIFT = 3
 
 
@@ -421,7 +421,7 @@ def _release_lines(releases: list[dict[str, Any]]) -> list[str]:
             else:
                 arrow = "📉" if after < before - 0.05 else "📈" if after > before + 0.05 else "➡️"
                 lines.append(
-                    f"{arrow} {store}: рейтинг {_score(before)} → {_score(after)} ★ "
+                    f"{store}: рейтинг {_score(before)} → {_score(after)} ★ {arrow} "
                     f"({after_n} {_ru_plural(after_n, 'отзыв', 'отзыва', 'отзывов')} на новой версии)"
                 )
         lines.append("")

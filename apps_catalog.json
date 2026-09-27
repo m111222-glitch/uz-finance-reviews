@@ -332,5 +332,61 @@
       "ios_id": "6737691444",
       "ios_bundle": "uz.tayyab.finance"
     }
+  ],
+  "release_only_apps": [
+    {
+      "slug": "alif-shop",
+      "name": "Alif Shop",
+      "play_id": "com.aliftech.alifshop",
+      "ios_id": "6443502616"
+    },
+    {
+      "slug": "uzum-market",
+      "name": "Uzum Market",
+      "play_id": "uz.uzum.app",
+      "ios_id": "1640483056"
+    },
+    {
+      "slug": "uzum-nasiya",
+      "name": "Uzum Nasiya",
+      "play_id": "uz.paymart.paymart_mobile",
+      "ios_id": "1579281935"
+    },
+    {
+      "slug": "asaxiy-market",
+      "name": "Asaxiy Market",
+      "play_id": "uz.asaxiy.market",
+      "ios_id": "1532401944"
+    },
+    {
+      "slug": "asaxiy-nasiya",
+      "name": "Asaxiy Nasiya",
+      "play_id": "uz.asaxiy.nasiya",
+      "ios_id": "6480398377"
+    },
+    {
+      "slug": "texnomart",
+      "name": "Texnomart",
+      "play_id": "com.texnomart.app",
+      "ios_id": "6443874184"
+    },
+    {
+      "slug": "mediapark",
+      "name": "Mediapark",
+      "play_id": "uz.mediapark.mediapark_client_mobile",
+      "ios_id": "1671707947"
+    },
+    {
+      "slug": "radius",
+      "name": "Radius",
+      "play_id": "uz.radius.nasiya",
+      "ios_id": "6746245125"
+    },
+    {
+      "slug": "olcha",
+      "name": "Olcha",
+      "play_id": "com.olcha.ecommerce",
+      "ios_id": "1551492785"
+    }
   ]
 }

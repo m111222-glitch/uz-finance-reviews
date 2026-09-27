@@ -170,6 +170,17 @@ def sync_all(
                 stats["apps_failed"] += 1
                 stats["errors"].append(f"{slug}: {exc}")
 
+        extra = catalog.get("release_only_apps") or []
+        if only_slug:
+            extra = [a for a in extra if a["slug"] == only_slug]
+        if extra:
+            try:
+                shop = releases.sync_release_only_apps(extra, country=country, lang=lang)
+                stats["new_releases"] += shop["new_releases"]
+                stats["errors"] += shop["errors"]
+            except Exception as exc:
+                stats["errors"].append(f"release-only apps: {exc}")
+
         try:
             from backend import notify
 
