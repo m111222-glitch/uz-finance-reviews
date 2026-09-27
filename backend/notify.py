@@ -6,6 +6,7 @@ import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Any
 
 import httpx
@@ -224,7 +225,7 @@ def format_message(review: dict[str, Any]) -> str:
         text = text[:1190] + "…"
 
     lines = [
-        f"<b>{_esc(app)}</b>  {stars} · {tag}",
+        f"{app_emoji(review.get('app_slug'))}<b>{_esc(app)}</b>  {stars} · {tag}",
         f"{store} · {_esc(author)} · {date}"
         + (f" · v{_esc(version)}" if version else ""),
     ]
@@ -247,6 +248,23 @@ def device_summary(review: dict[str, Any]) -> str:
     if kind and kind != "phone":
         parts.insert(0, kind.capitalize())
     return " · ".join(p for p in parts if p)
+
+
+@lru_cache(maxsize=1)
+def _app_emoji_map() -> dict[str, dict[str, str]]:
+    return {a["slug"]: a["tg_emoji"] for a in db.load_catalog()["apps"] if a.get("tg_emoji")}
+
+
+def app_emoji(slug: str | None) -> str:
+    """Custom-emoji logo to put before an app name, or "" when off or unmapped.
+
+    Bots can only send custom emoji to channels once they own a Fragment username,
+    hence the TELEGRAM_CUSTOM_EMOJI switch.
+    """
+    if os.getenv("TELEGRAM_CUSTOM_EMOJI", "").strip().lower() not in {"1", "true", "yes"}:
+        return ""
+    e = _app_emoji_map().get(slug or "")
+    return f'<tg-emoji emoji-id="{e["id"]}">{e["emoji"]}</tg-emoji> ' if e else ""
 
 
 def country_flag(code: str | None) -> str:
@@ -471,6 +489,7 @@ def format_daily_summary(
         counts = {n: sum(1 for r in rows if r["rating"] == n) for n in range(1, 6)}
         avg = sum(n * c for n, c in counts.items()) / len(rows) if rows else None
         apps.append({
+            "slug": slug,
             "name": SUMMARY_APP_NAMES.get(slug, slug),
             "rows": rows,
             "counts": counts,
@@ -490,12 +509,12 @@ def format_daily_summary(
     for a in apps:
         name = _esc(a["name"])
         if a["avg"] is None:
-            lines += [f"⚪ <b>{name}</b> — нет отзывов", ""]
+            lines += [f"⚪ {app_emoji(a['slug'])}<b>{name}</b> — нет отзывов", ""]
             continue
         n = len(a["rows"])
         score = f"{a['avg']:.2f}".replace(".", ",")
         lines += [
-            f"{_rating_marker(a['avg'])} <b>{name}</b> — {score} ★",
+            f"{_rating_marker(a['avg'])} {app_emoji(a['slug'])}<b>{name}</b> — {score} ★",
             f"{n} {_ru_plural(n, 'отзыв', 'отзыва', 'отзывов')} · негативных: {a['negatives']}",
             *_complaint_lines(a["rows"]),
             "",
@@ -511,7 +530,7 @@ def format_daily_summary(
         dist = " · ".join(
             f"{'★' * star} {a['counts'][star]}" for star in range(5, 0, -1) if a["counts"][star]
         )
-        lines += [_esc(a["name"]), dist, ""]
+        lines += [app_emoji(a["slug"]) + _esc(a["name"]), dist, ""]
     return "\n".join(lines).strip()
 
 

@@ -138,7 +138,9 @@ def format_release(rel: dict[str, Any], *, same_notes_as: str | None = None) -> 
     app = rel.get("display_name") or rel.get("app_name") or rel["app_slug"]
     store = STORE_NAMES.get(rel["store"], rel["store"])
     version = rel.get("version")
-    head = f"🚀 <b>{notify._esc(app)}</b>" + (f" {notify._esc(version)}" if version else "")
+    head = f"🚀 {notify.app_emoji(rel['app_slug'])}<b>{notify._esc(app)}</b>" + (
+        f" {notify._esc(version)}" if version else ""
+    )
     date = notify._tashkent_date(rel.get("released_at") or rel.get("first_seen_at"))
     lines = [head, f"{store} · {date}", ""]
     notes = (rel.get("notes") or "").strip()

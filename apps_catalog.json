@@ -14,7 +14,8 @@
       "play_console": {
         "developer_id": "8828065338941423741",
         "app_id": "4972306327806446195"
-      }
+      },
+      "tg_emoji": {"id": "5253655686398629310", "emoji": "📱"}
     },
     {
       "slug": "payme",
@@ -22,7 +23,8 @@
       "brand": "Payme",
       "play_id": "uz.dida.payme",
       "ios_id": "1093525667",
-      "ios_bundle": "uz.payme.Payme"
+      "ios_bundle": "uz.payme.Payme",
+      "tg_emoji": {"id": "5422762709349323426", "emoji": "🔄"}
     },
     {
       "slug": "click",
@@ -30,7 +32,8 @@
       "brand": "Click",
       "play_id": "air.com.ssdsoftwaresolutions.clickuz",
       "ios_id": "768132591",
-      "ios_bundle": "com.ssdsoftwaresolutions.clickuz"
+      "ios_bundle": "com.ssdsoftwaresolutions.clickuz",
+      "tg_emoji": {"id": "5195248971601171589", "emoji": "🔄"}
     },
     {
       "slug": "uzum-bank",
@@ -38,7 +41,8 @@
       "brand": "Uzum",
       "play_id": "uz.kapitalbank.android",
       "ios_id": "1492307726",
-      "ios_bundle": "uz.kapitalbank.apelsin"
+      "ios_bundle": "uz.kapitalbank.apelsin",
+      "tg_emoji": {"id": "5269653116726289687", "emoji": "💳"}
     },
     {
       "slug": "tbc-uz",
@@ -46,7 +50,8 @@
       "brand": "TBC Bank",
       "play_id": "ge.space.app.uzbekistan",
       "ios_id": "1450503714",
-      "ios_bundle": "ge.tbc.tbcuz"
+      "ios_bundle": "ge.tbc.tbcuz",
+      "tg_emoji": {"id": "5265066151783703915", "emoji": "🏦"}
     },
     {
       "slug": "anor-bank",
@@ -54,7 +59,8 @@
       "brand": "Anor Bank",
       "play_id": "uz.anormobile.retail",
       "ios_id": "1579623268",
-      "ios_bundle": "uz.anorbank.mobile"
+      "ios_bundle": "uz.anorbank.mobile",
+      "tg_emoji": {"id": "5321348060360483066", "emoji": "🏦"}
     },
     {
       "slug": "kapitalbank",
@@ -62,7 +68,8 @@
       "brand": "Kapitalbank",
       "play_id": "uz.kapitalbank.kbonline",
       "ios_id": "1546213356",
-      "ios_bundle": "uz.kapitalbank.kbonline"
+      "ios_bundle": "uz.kapitalbank.kbonline",
+      "tg_emoji": {"id": "5280921732226490806", "emoji": "🏦"}
     },
     {
       "slug": "ipak-yuli",
@@ -70,7 +77,8 @@
       "brand": "Ipak Yuli Bank",
       "play_id": "com.ipakyulibank.mobile",
       "ios_id": "1436677359",
-      "ios_bundle": "com.tune.ipakyuli"
+      "ios_bundle": "com.tune.ipakyuli",
+      "tg_emoji": {"id": "5377736913622962035", "emoji": "🏦"}
     },
     {
       "slug": "hamkorbank",
@@ -78,7 +86,8 @@
       "brand": "Hamkorbank",
       "play_id": "com.hamkorbank.mobile",
       "ios_id": "1602323485",
-      "ios_bundle": "com.hamkorbank.mobile"
+      "ios_bundle": "com.hamkorbank.mobile",
+      "tg_emoji": {"id": "5391231580607894115", "emoji": "🏦"}
     },
     {
       "slug": "sqb",
@@ -86,7 +95,8 @@
       "brand": "SQB",
       "play_id": "com.uzpsb.olam",
       "ios_id": "1499606946",
-      "ios_bundle": "com.uzpsb.olam"
+      "ios_bundle": "com.uzpsb.olam",
+      "tg_emoji": {"id": "5337036334647231542", "emoji": "🏦"}
     },
     {
       "slug": "beepul",
@@ -110,7 +120,8 @@
       "brand": "Octobank",
       "play_id": "com.ravnaqbank.rbkmobile",
       "ios_id": "1460141475",
-      "ios_bundle": "com.rbk.RBKMobile"
+      "ios_bundle": "com.rbk.RBKMobile",
+      "tg_emoji": {"id": "5300855087764098456", "emoji": "🏦"}
     },
     {
       "slug": "davr-bank",
@@ -118,7 +129,8 @@
       "brand": "Davr Bank",
       "play_id": "uz.davrbank.mobile",
       "ios_id": "6483247810",
-      "ios_bundle": "uz.idev.app.davrbank.NewDavrMobile"
+      "ios_bundle": "uz.idev.app.davrbank.NewDavrMobile",
+      "tg_emoji": {"id": "5210972726612749850", "emoji": "🏦"}
     },
     {
       "slug": "agrobank",
@@ -126,7 +138,8 @@
       "brand": "Agrobank",
       "play_id": "uz.agrobank.mobile",
       "ios_id": "1638716474",
-      "ios_bundle": "uz.agrobank.mobile-ios"
+      "ios_bundle": "uz.agrobank.mobile-ios",
+      "tg_emoji": {"id": "5190479436188753706", "emoji": "🏦"}
     },
     {
       "slug": "imanum",
@@ -142,7 +155,8 @@
       "brand": "Paynet",
       "play_id": "uz.paynet.app",
       "ios_id": "1307888692",
-      "ios_bundle": "GS.Uzpaynet"
+      "ios_bundle": "GS.Uzpaynet",
+      "tg_emoji": {"id": "5422521297827549563", "emoji": "💳"}
     },
     {
       "slug": "avo",
@@ -150,7 +164,8 @@
       "brand": "AVO",
       "play_id": "uz.avo.app",
       "ios_id": "6463799850",
-      "ios_bundle": "uz.avo.app"
+      "ios_bundle": "uz.avo.app",
+      "tg_emoji": {"id": "5395809435924835697", "emoji": "🏦"}
     },
     {
       "slug": "tez",
@@ -182,7 +197,8 @@
       "brand": "Milliy",
       "play_id": "com.tune.milliy",
       "ios_id": "1297283006",
-      "ios_bundle": "com.nbu.milliy"
+      "ios_bundle": "com.nbu.milliy",
+      "tg_emoji": {"id": "5264913942437699472", "emoji": "🏦"}
     },
     {
       "slug": "domo",
@@ -198,7 +214,8 @@
       "brand": "Ipoteka Bank",
       "play_id": "com.IpotekaMobile.v2",
       "ios_id": "6502378970",
-      "ios_bundle": "com.IpotekaMobile.v2"
+      "ios_bundle": "com.IpotekaMobile.v2",
+      "tg_emoji": {"id": "5206285306680061696", "emoji": "🏦"}
     },
     {
       "slug": "zoomrad",
@@ -206,7 +223,8 @@
       "brand": "Zoomrad",
       "play_id": "uz.aloqabank.zoomrad",
       "ios_id": "1522419775",
-      "ios_bundle": "uz.zoomrad"
+      "ios_bundle": "uz.zoomrad",
+      "tg_emoji": {"id": "5192668757113184656", "emoji": "💳"}
     },
     {
       "slug": "asakabank",
@@ -214,7 +232,8 @@
       "brand": "Asakabank",
       "play_id": "uz.asakabank.myasaka",
       "ios_id": "1574165416",
-      "ios_bundle": "uz.asakabank.my"
+      "ios_bundle": "uz.asakabank.my",
+      "tg_emoji": {"id": "5271853514371374368", "emoji": "🏦"}
     },
     {
       "slug": "infinbank",
@@ -222,7 +241,8 @@
       "brand": "InfinBANK",
       "play_id": "uz.xsoft.myinfin",
       "ios_id": "1454367354",
-      "ios_bundle": "com.infin.myinfin"
+      "ios_bundle": "com.infin.myinfin",
+      "tg_emoji": {"id": "5265099351880901075", "emoji": "🏦"}
     },
     {
       "slug": "tenge24",
@@ -230,7 +250,8 @@
       "brand": "Tenge24",
       "play_id": "uz.tune.tenge",
       "ios_id": "1586139053",
-      "ios_bundle": "uz.tenge.home"
+      "ios_bundle": "uz.tenge.home",
+      "tg_emoji": {"id": "5240492401910374013", "emoji": "🏦"}
     },
     {
       "slug": "ipoteka-retail",
@@ -239,7 +260,8 @@
       "play_id": null,
       "ios_id": null,
       "ios_bundle": null,
-      "huawei_id": "C109188789"
+      "huawei_id": "C109188789",
+      "tg_emoji": {"id": "5206285306680061696", "emoji": "🏦"}
     },
     {
       "slug": "ipoteka-business",
@@ -247,7 +269,8 @@
       "brand": "Ipoteka Bank",
       "play_id": "uz.asbt.ipotekabank2.mobilebank.yur",
       "ios_id": "1298501704",
-      "ios_bundle": "com.asbt.ipotekamobilefiz2"
+      "ios_bundle": "com.asbt.ipotekamobilefiz2",
+      "tg_emoji": {"id": "5206285306680061696", "emoji": "🏦"}
     },
     {
       "slug": "mavrid",
@@ -263,7 +286,8 @@
       "brand": "Openbank",
       "play_id": "uz.smartbank",
       "ios_id": "6446754221",
-      "ios_bundle": "com.SmartBankAJ.com"
+      "ios_bundle": "com.SmartBankAJ.com",
+      "tg_emoji": {"id": "5357131447243145911", "emoji": "🏦"}
     },
     {
       "slug": "apex",
@@ -271,7 +295,8 @@
       "brand": "APEX",
       "play_id": "com.fincube.apexbank",
       "ios_id": "6469687454",
-      "ios_bundle": "uz.apexbank.apexmobile"
+      "ios_bundle": "uz.apexbank.apexmobile",
+      "tg_emoji": {"id": "5237756542102546146", "emoji": "🏦"}
     },
     {
       "slug": "oson",
@@ -279,7 +304,8 @@
       "brand": "OSON",
       "play_id": "com.oson",
       "ios_id": "1207834182",
-      "ios_bundle": "uz.oson"
+      "ios_bundle": "uz.oson",
+      "tg_emoji": {"id": "5366430622669610501", "emoji": "💳"}
     },
     {
       "slug": "humans",
@@ -287,7 +313,8 @@
       "brand": "HUMANS",
       "play_id": "net.humans.fintech_uz",
       "ios_id": "1508198703",
-      "ios_bundle": "net.humans.fintech-uz"
+      "ios_bundle": "net.humans.fintech-uz",
+      "tg_emoji": {"id": "5301128711540586647", "emoji": "💰"}
     },
     {
       "slug": "brb",
@@ -295,7 +322,8 @@
       "brand": "BRB",
       "play_id": "com.qqb.quant",
       "ios_id": "1524422825",
-      "ios_bundle": "com.qqb.ios"
+      "ios_bundle": "com.qqb.ios",
+      "tg_emoji": {"id": "5341515968357087457", "emoji": "🏦"}
     },
     {
       "slug": "ofb",
@@ -303,7 +331,8 @@
       "brand": "OFB",
       "play_id": "uz.ofbmobile.android",
       "ios_id": "6443708765",
-      "ios_bundle": "uz.ofb.mobile"
+      "ios_bundle": "uz.ofb.mobile",
+      "tg_emoji": {"id": "5264824345124937550", "emoji": "🏦"}
     },
     {
       "slug": "trastpay",
@@ -311,7 +340,8 @@
       "brand": "Trastpay",
       "play_id": "trastpay.uz",
       "ios_id": "6443658536",
-      "ios_bundle": "trastpay.uz"
+      "ios_bundle": "trastpay.uz",
+      "tg_emoji": {"id": "5265175819478638264", "emoji": "🏦"}
     },
     {
       "slug": "hayot-bank",
@@ -319,7 +349,8 @@
       "brand": "Hayot Bank",
       "play_id": "uz.cbssolutions.mobile",
       "ios_id": "6468219656",
-      "ios_bundle": "uz.hayotbank.mobile"
+      "ios_bundle": "uz.hayotbank.mobile",
+      "tg_emoji": {"id": "5235515690160500886", "emoji": "🏦"}
     },
     {
       "slug": "open-muddatli",
@@ -327,7 +358,8 @@
       "brand": "Open",
       "play_id": "com.open.uz",
       "ios_id": "6444692644",
-      "ios_bundle": "com.openfintech.open"
+      "ios_bundle": "com.openfintech.open",
+      "tg_emoji": {"id": "5375431263509315074", "emoji": "🏦"}
     },
     {
       "slug": "tayanch",
@@ -375,7 +407,8 @@
       "brand": "Uzum",
       "play_id": "uz.uzum.avto.android",
       "ios_id": "6451148480",
-      "ios_bundle": "uz.uzum.avto"
+      "ios_bundle": "uz.uzum.avto",
+      "tg_emoji": {"id": "5222446053139162266", "emoji": "🏦"}
     }
   ],
   "release_only_apps": [
