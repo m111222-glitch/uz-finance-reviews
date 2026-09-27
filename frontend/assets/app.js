@@ -149,7 +149,7 @@ function setView(name) {
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${name}`));
   const titles = {
     overview: ["Overview", "Ratings & reviews for UZ finance category leaders"],
-    apps: ["Apps", "Catalog of tracked finance apps in Uzbekistan"],
+    apps: ["Who is at the TOP?", "Tracked apps ranked by rating, highest first"],
     reviews: ["Reviews", "Browse and filter scraped store reviews"],
     themes: ["Themes", "What users talk about — positives & pain points"],
   };
