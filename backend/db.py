@@ -663,6 +663,18 @@ def record_release(
         return cur.rowcount > 0
 
 
+def release_notes(slug: str, store: str, version: str) -> str | None:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT notes FROM app_releases
+            WHERE app_slug = ? AND store = ? AND version = ?
+            """,
+            (slug, store, version),
+        ).fetchone()
+        return row[0] if row else None
+
+
 def unposted_releases(limit: int = 50) -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute(

@@ -390,7 +390,12 @@ def _rating_marker(avg: float) -> str:
     return "🔴"
 
 
-RELEASE_STORE_NAMES = {"ios": "🍎 App Store", "play": "🤖 Google Play", "huawei": "AppGallery"}
+RELEASE_STORE_NAMES = {
+    "ios": "🍎 App Store",
+    "play": "🤖 Google Play",
+    "huawei": "🌺 AppGallery",
+    "xiaomi": "🟧 GetApps",
+}
 MIN_REVIEWS_FOR_SHIFT = 3
 
 
@@ -410,7 +415,9 @@ def _release_lines(releases: list[dict[str, Any]]) -> list[str]:
         stores = ", ".join(RELEASE_STORE_NAMES.get(r["store"], r["store"]) for r in rels)
         lines.append(f"<b>{name}</b> {_esc(version) or 'новая версия'} · {stores}")
         for r in rels:
-            shift = r.get("shift") or {}
+            if "shift" not in r:
+                continue  # GetApps has no reviews to compare
+            shift = r["shift"] or {}
             store = RELEASE_STORE_NAMES.get(r["store"], r["store"])
             before, after = shift.get("before_avg"), shift.get("after_avg")
             after_n = shift.get("after_n") or 0

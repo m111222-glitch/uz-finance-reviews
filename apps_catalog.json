@@ -331,6 +331,38 @@
       "play_id": "uz.finance.tayyab",
       "ios_id": "6737691444",
       "ios_bundle": "uz.tayyab.finance"
+    },
+    {
+      "slug": "saferoad",
+      "name": "SafeRoad YHXX",
+      "brand": "Autodoc",
+      "play_id": "uz.autodoc.saferoad24",
+      "ios_id": "6737189411",
+      "ios_bundle": "uz.autodoc.road247"
+    },
+    {
+      "slug": "road24",
+      "name": "Road24",
+      "brand": "Road24",
+      "play_id": "uz.kashapp.road24jarimalar",
+      "ios_id": "1543010525",
+      "ios_bundle": "uz.kashapp.road24"
+    },
+    {
+      "slug": "road24-pro",
+      "name": "Road24 Pro",
+      "brand": "Road24",
+      "play_id": "uz.road.yordam24.pro",
+      "ios_id": "6756430931",
+      "ios_bundle": "uz.road.yordam24.pro"
+    },
+    {
+      "slug": "hamroh",
+      "name": "Hamroh",
+      "brand": "Telecom Soft",
+      "play_id": "uz.mobilex.hamroh",
+      "ios_id": "6745878978",
+      "ios_bundle": "uz.mobilex.hamroh"
     }
   ],
   "release_only_apps": [
@@ -356,13 +388,15 @@
       "slug": "asaxiy-market",
       "name": "Asaxiy Market",
       "play_id": "uz.asaxiy.market",
-      "ios_id": "1532401944"
+      "ios_id": "1532401944",
+      "huawei_id": "C107759131"
     },
     {
       "slug": "asaxiy-nasiya",
       "name": "Asaxiy Nasiya",
       "play_id": "uz.asaxiy.nasiya",
-      "ios_id": "6480398377"
+      "ios_id": "6480398377",
+      "huawei_id": "C111157511"
     },
     {
       "slug": "texnomart",
@@ -380,13 +414,38 @@
       "slug": "radius",
       "name": "Radius",
       "play_id": "uz.radius.nasiya",
-      "ios_id": "6746245125"
+      "ios_id": "6746245125",
+      "huawei_id": "C114487481"
     },
     {
       "slug": "olcha",
       "name": "Olcha",
       "play_id": "com.olcha.ecommerce",
       "ios_id": "1551492785"
+    },
+    {
+      "slug": "saferoad",
+      "name": "SafeRoad YHXX",
+      "play_id": "uz.autodoc.saferoad24",
+      "ios_id": "6737189411"
+    },
+    {
+      "slug": "road24",
+      "name": "Road24",
+      "play_id": "uz.kashapp.road24jarimalar",
+      "ios_id": "1543010525"
+    },
+    {
+      "slug": "road24-pro",
+      "name": "Road24 Pro",
+      "play_id": "uz.road.yordam24.pro",
+      "ios_id": "6756430931"
+    },
+    {
+      "slug": "hamroh",
+      "name": "Hamroh",
+      "play_id": "uz.mobilex.hamroh",
+      "ios_id": "6745878978"
     }
   ]
 }

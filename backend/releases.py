@@ -12,7 +12,8 @@ from backend import db, notify
 STORE_NAMES = {
     "ios": "🍎 App Store",
     "play": "🤖 Google Play",
-    "huawei": "AppGallery",
+    "huawei": "🌺 AppGallery",
+    "xiaomi": "🟧 GetApps",
 }
 
 # Play lists this instead of a version for apps with per-device builds
@@ -64,6 +65,13 @@ def extract(store: str, meta: dict[str, Any]) -> dict[str, Any] | None:
             "released_at": _utc_iso(meta.get("releaseDate")),
             "notes": meta.get("releaseNotes"),
         }
+    elif store == "xiaomi":
+        # GetApps pages carry no changelog; notes are borrowed from Play below
+        out = {
+            "version": _version(meta.get("version")),
+            "released_at": _utc_iso(meta.get("updated_at")),
+            "notes": None,
+        }
     else:
         return None
     out["notes"] = (out["notes"] or "").strip() or None
@@ -76,6 +84,9 @@ def record_from_meta(
     new = 0
     for store, meta in meta_blob.items():
         rel = extract(store, meta or {})
+        if rel and store == "xiaomi" and rel["version"]:
+            # Xiaomi ships the same APK as Play, usually a version or two behind
+            rel["notes"] = db.release_notes(slug, "play", rel["version"])
         if rel and db.record_release(slug, store, app_name=app_name, **rel):
             new += 1
     return new
@@ -85,7 +96,7 @@ def sync_release_only_apps(
     apps: list[dict[str, Any]], *, country: str, lang: str
 ) -> dict[str, Any]:
     """Shops etc. we follow for release notes only — no reviews, no dashboard row."""
-    from backend.scrapers import appstore, play
+    from backend.scrapers import appstore, huawei, play
 
     stats: dict[str, Any] = {"new_releases": 0, "errors": []}
     for app in apps:
@@ -104,6 +115,11 @@ def sync_release_only_apps(
                 ).get("meta") or {}
             except Exception as exc:
                 stats["errors"].append(f"{app['slug']}/ios: {exc}")
+        if app.get("huawei_id"):
+            try:
+                meta_blob["huawei"] = huawei.fetch_huawei_meta(app["huawei_id"]).get("meta") or {}
+            except Exception as exc:
+                stats["errors"].append(f"{app['slug']}/huawei: {exc}")
         try:
             stats["new_releases"] += record_from_meta(
                 app["slug"], meta_blob, app_name=app["name"]
