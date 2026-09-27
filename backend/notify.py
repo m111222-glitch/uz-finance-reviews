@@ -191,6 +191,7 @@ STAR_TAGS = {
 }
 
 APP_HASHTAGS = {"alif-mobi": "#Alif"}
+PRIORITY_APP_SLUGS = ("alif-mobi",)
 
 SUMMARY_APP_SLUGS = ("alif-mobi", "click", "payme", "paynet", "xazna", "uzum-bank")
 TASHKENT = timezone(timedelta(hours=5))
@@ -543,8 +544,10 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
     rows = db.unposted_star_reviews(since_iso=since, limit=400)
     stats["considered"] = len(rows)
 
-    # Post oldest first so the channel reads chronologically
+    # Oldest first so the channel reads chronologically; the stable sort then
+    # moves priority apps to the front without reordering within each group
     rows = list(reversed(rows))
+    rows.sort(key=lambda r: r.get("app_slug") not in PRIORITY_APP_SLUGS)
     max_per_run = int(os.getenv("TELEGRAM_MAX_PER_RUN", "30"))
     for review in rows:
         if not has_context(review):
@@ -553,7 +556,8 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
         if dry_run:
             stats["posted"] += 1
             continue
-        if stats["posted"] >= max_per_run:
+        # Priority apps are never deferred; the cap only holds back the rest
+        if stats["posted"] >= max_per_run and review.get("app_slug") not in PRIORITY_APP_SLUGS:
             stats["deferred"] = stats.get("deferred", 0) + 1
             continue
         try:
