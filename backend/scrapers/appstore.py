@@ -69,6 +69,7 @@ def fetch_ios_meta(app_id: str, *, country: str = "uz") -> dict[str, Any]:
                 "primaryGenreName": data.get("primaryGenreName"),
                 "trackViewUrl": data.get("trackViewUrl"),
                 "currentVersionReleaseDate": data.get("currentVersionReleaseDate"),
+                "releaseNotes": data.get("releaseNotes"),
                 "description": (data.get("description") or "")[:500],
                 "averageUserRatingForCurrentVersion": data.get(
                     "averageUserRatingForCurrentVersion"

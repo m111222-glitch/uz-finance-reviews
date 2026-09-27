@@ -13,6 +13,7 @@ primary_region = 'ams'
   AUTO_SYNC_HOURS = '3'
   DATA_DIR = '/data'
   TELEGRAM_LOOKBACK_HOURS = '48'
+  TELEGRAM_RELEASES_CHAT_ID = '@ReleasedPochti'
 
 [mounts]
   source = 'reviews_data'

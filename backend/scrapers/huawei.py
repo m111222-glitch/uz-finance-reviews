@@ -102,6 +102,13 @@ def search_app(query: str, *, package: str | None = None, name: str | None = Non
         client.close()
 
 
+def _iso_ddmmyyyy(value: Any) -> str | None:
+    try:
+        return datetime.strptime(str(value), "%d.%m.%Y").replace(tzinfo=timezone.utc).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
 def fetch_huawei_meta(app_id: str) -> dict[str, Any]:
     client = _open()
     try:
@@ -120,10 +127,16 @@ def fetch_huawei_meta(app_id: str) -> dict[str, Any]:
     icon = None
     developer = None
     version = None
+    release_date = None
+    release_notes = None
     for block in data.get("layoutData") or []:
         for item in block.get("dataList") or []:
             if not isinstance(item, dict):
                 continue
+            if block.get("layoutName") == "detailappinfocard":
+                release_date = release_date or _iso_ddmmyyyy(item.get("releaseDate"))
+            if block.get("layoutName") == "detailprizecard":  # "Обновления" card
+                release_notes = release_notes or item.get("body")
             name = name or item.get("name")
             package = package or item.get("package")
             if item.get("stars") is not None:
@@ -143,6 +156,8 @@ def fetch_huawei_meta(app_id: str) -> dict[str, Any]:
             "package": package,
             "developer": developer,
             "version": version,
+            "releaseDate": release_date,
+            "releaseNotes": release_notes,
             "installs": installs,
             "appid": app_id,
             "url": f"https://appgallery.huawei.com/app/{app_id}",

@@ -260,9 +260,9 @@ def _redact(text: str) -> str:
     return text
 
 
-def send_message(text: str, *, retries: int = 4) -> None:
+def send_message(text: str, *, chat_id: str | None = None, retries: int = 4) -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    chat_id = (chat_id or os.getenv("TELEGRAM_CHAT_ID", "")).strip()
     if not token or not chat_id:
         raise RuntimeError("Telegram is not configured")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -390,7 +390,49 @@ def _rating_marker(avg: float) -> str:
     return "🔴"
 
 
-def format_daily_summary(day: str, by_slug: dict[str, list[dict[str, Any]]]) -> str:
+RELEASE_STORE_NAMES = {"ios": "App Store", "play": "Google Play", "huawei": "AppGallery"}
+MIN_REVIEWS_FOR_SHIFT = 3
+
+
+def _score(avg: float) -> str:
+    return f"{avg:.2f}".replace(".", ",")
+
+
+def _release_lines(releases: list[dict[str, Any]]) -> list[str]:
+    """'Payme 3.14.2 — App Store: 4,10 → 3,60 ★' for each build released that day."""
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for rel in releases:
+        key = (rel["app_slug"], rel.get("version") or "")
+        groups.setdefault(key, []).append(rel)
+    lines: list[str] = []
+    for (slug, version), rels in groups.items():
+        name = _esc(SUMMARY_APP_NAMES.get(slug, slug))
+        stores = ", ".join(RELEASE_STORE_NAMES.get(r["store"], r["store"]) for r in rels)
+        lines.append(f"<b>{name}</b> {_esc(version) or 'новая версия'} · {stores}")
+        for r in rels:
+            shift = r.get("shift") or {}
+            store = RELEASE_STORE_NAMES.get(r["store"], r["store"])
+            before, after = shift.get("before_avg"), shift.get("after_avg")
+            after_n = shift.get("after_n") or 0
+            if after is None or after_n < MIN_REVIEWS_FOR_SHIFT:
+                lines.append(f"{store}: пока мало отзывов о новой версии ({after_n})")
+            elif before is None:
+                lines.append(f"{store}: {_score(after)} ★ на новой версии ({after_n})")
+            else:
+                arrow = "📉" if after < before - 0.05 else "📈" if after > before + 0.05 else "➡️"
+                lines.append(
+                    f"{arrow} {store}: рейтинг {_score(before)} → {_score(after)} ★ "
+                    f"({after_n} {_ru_plural(after_n, 'отзыв', 'отзыва', 'отзывов')} на новой версии)"
+                )
+        lines.append("")
+    return lines
+
+
+def format_daily_summary(
+    day: str,
+    by_slug: dict[str, list[dict[str, Any]]],
+    releases: list[dict[str, Any]] | None = None,
+) -> str:
     d = datetime.fromisoformat(day).date()
     apps = []
     for slug in SUMMARY_APP_SLUGS:
@@ -428,6 +470,9 @@ def format_daily_summary(day: str, by_slug: dict[str, list[dict[str, Any]]]) -> 
             "",
         ]
 
+    if releases:
+        lines += ["━━━━━━━━━━━━━━", "", "🚀 Новые версии", "", *_release_lines(releases)]
+
     lines += ["━━━━━━━━━━━━━━", "", "⭐ Распределение оценок", ""]
     for a in apps:
         if a["avg"] is None:
@@ -450,7 +495,18 @@ def maybe_post_daily_summary(*, dry_run: bool = False) -> dict[str, Any]:
         by_slug[slug] = db.reviews_in_range(
             start_iso=start_iso, end_iso=end_iso, slugs=[slug]
         )
-    text = format_daily_summary(day, by_slug)
+    releases = db.releases_in_range(
+        start_iso=start_iso, end_iso=end_iso, slugs=SUMMARY_APP_SLUGS
+    )
+    for rel in releases:
+        if rel["store"] in ("ios", "play", "huawei"):
+            rel["shift"] = db.version_rating_shift(
+                rel["app_slug"],
+                rel["store"],
+                version=rel.get("version"),
+                released_at=rel.get("released_at") or rel["first_seen_at"],
+            )
+    text = format_daily_summary(day, by_slug, releases)
     out["preview"] = text
     if dry_run or not enabled():
         return out

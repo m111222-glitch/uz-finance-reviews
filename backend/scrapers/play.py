@@ -7,11 +7,22 @@ from datetime import datetime, timezone
 from typing import Any
 
 from google_play_scraper import Sort, app as play_app, reviews as play_reviews
+from google_play_scraper.constants.element import ElementSpec, ElementSpecs
+from google_play_scraper.utils.data_processors import unescape_text
+
+# The library ships this spec commented out, so "What's new" always came back
+# empty; the notes still live at this path in the details payload.
+ElementSpecs.Detail.setdefault(
+    "recentChanges",
+    ElementSpec(5, [1, 2, 144, 1, 1], lambda s: unescape_text(s).replace("\r\n", "\n")),
+)
 
 
 def _iso(dt: Any) -> str | None:
     if dt is None:
         return None
+    if isinstance(dt, (int, float)):
+        return datetime.fromtimestamp(dt, tz=timezone.utc).isoformat()
     if isinstance(dt, datetime):
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
@@ -33,6 +44,7 @@ def fetch_play_meta(app_id: str, *, country: str = "uz", lang: str = "ru") -> di
             "url": data.get("url"),
             "updated": _iso(data.get("updated")),
             "version": data.get("version"),
+            "recentChanges": data.get("recentChanges"),
             "free": data.get("free"),
             "containsAds": data.get("containsAds"),
             "reviews": data.get("reviews"),

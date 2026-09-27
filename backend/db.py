@@ -120,6 +120,21 @@ def init_db() -> None:
                 posted_at TEXT NOT NULL,
                 payload_json TEXT
             );
+
+            -- One row per store build we've seen; release_key is the version, or
+            -- the listing's update time when the store hides it ("Varies with device").
+            CREATE TABLE IF NOT EXISTS app_releases (
+                app_slug TEXT NOT NULL,
+                store TEXT NOT NULL,
+                release_key TEXT NOT NULL,
+                version TEXT,
+                released_at TEXT,
+                notes TEXT,
+                first_seen_at TEXT NOT NULL,
+                posted_at TEXT,
+                PRIMARY KEY (app_slug, store, release_key),
+                FOREIGN KEY (app_slug) REFERENCES apps(slug)
+            );
             """
         )
         _migrate_reviews_store(conn)
@@ -572,6 +587,150 @@ def mark_telegram_posted(review_id: str, rating: int | None) -> None:
             """,
             (review_id, rating, utcnow()),
         )
+
+
+def record_release(
+    slug: str,
+    store: str,
+    *,
+    version: str | None,
+    released_at: str | None,
+    notes: str | None,
+    backfill_hours: float = 48.0,
+) -> bool:
+    """Store a build the first time a sync sees it; returns True if it's new.
+
+    The first build seen for an app+store is only queued for posting if it came
+    out within ``backfill_hours``, so the first deploy doesn't dump 100 posts.
+    """
+    key = version or released_at
+    if not key:
+        return False
+    now = utcnow()
+    with connect() as conn:
+        known = conn.execute(
+            "SELECT 1 FROM app_releases WHERE app_slug = ? AND store = ? LIMIT 1",
+            (slug, store),
+        ).fetchone()
+        posted_at = None
+        if not known:
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=backfill_hours)).isoformat()
+            if not released_at or released_at < cutoff:
+                posted_at = "baseline"
+        cur = conn.execute(
+            """
+            INSERT OR IGNORE INTO app_releases (
+                app_slug, store, release_key, version, released_at, notes,
+                first_seen_at, posted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (slug, store, key, version, released_at, notes, now, posted_at),
+        )
+        return cur.rowcount > 0
+
+
+def unposted_releases(limit: int = 50) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT r.*, a.name AS app_name
+            FROM app_releases r
+            JOIN apps a ON a.slug = r.app_slug
+            WHERE r.posted_at IS NULL
+            ORDER BY COALESCE(r.released_at, r.first_seen_at)
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def posted_release_notes(slug: str, version: str) -> list[dict[str, Any]]:
+    """Other stores' already-posted builds of the same version (to skip repeat notes)."""
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT store, notes FROM app_releases
+            WHERE app_slug = ? AND version = ? AND posted_at IS NOT NULL
+              AND posted_at != 'baseline'
+            """,
+            (slug, version),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_release_posted(slug: str, store: str, release_key: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE app_releases SET posted_at = ?
+            WHERE app_slug = ? AND store = ? AND release_key = ?
+            """,
+            (utcnow(), slug, store, release_key),
+        )
+
+
+def releases_in_range(
+    *, start_iso: str, end_iso: str, slugs: list[str] | tuple[str, ...]
+) -> list[dict[str, Any]]:
+    placeholders = ",".join("?" * len(slugs))
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT * FROM app_releases
+            WHERE COALESCE(released_at, first_seen_at) >= ?
+              AND COALESCE(released_at, first_seen_at) < ?
+              AND app_slug IN ({placeholders})
+            ORDER BY COALESCE(released_at, first_seen_at)
+            """,
+            [start_iso, end_iso, *slugs],
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def version_rating_shift(
+    slug: str,
+    store: str,
+    *,
+    version: str | None,
+    released_at: str,
+    before_days: int = 14,
+) -> dict[str, Any]:
+    """Average rating on the store in the ``before_days`` before a release vs. since it.
+
+    "After" counts only reviews left on the new version when the store reports it.
+    """
+    start = (
+        datetime.fromisoformat(released_at) - timedelta(days=before_days)
+    ).isoformat()
+    after_sql = "COALESCE(review_date, scraped_at) >= ?"
+    after_params: list[Any] = [released_at]
+    if version:
+        after_sql += " AND version = ?"
+        after_params.append(version)
+    with connect() as conn:
+        before = conn.execute(
+            """
+            SELECT AVG(rating), COUNT(*) FROM reviews
+            WHERE app_slug = ? AND store = ? AND rating BETWEEN 1 AND 5
+              AND COALESCE(review_date, scraped_at) >= ?
+              AND COALESCE(review_date, scraped_at) < ?
+            """ + (" AND (version IS NULL OR version != ?)" if version else ""),
+            [slug, store, start, released_at] + ([version] if version else []),
+        ).fetchone()
+        after = conn.execute(
+            f"""
+            SELECT AVG(rating), COUNT(*) FROM reviews
+            WHERE app_slug = ? AND store = ? AND rating BETWEEN 1 AND 5 AND {after_sql}
+            """,
+            [slug, store, *after_params],
+        ).fetchone()
+    return {
+        "before_avg": before[0],
+        "before_n": before[1],
+        "after_avg": after[0],
+        "after_n": after[1],
+    }
 
 
 def last_successful_sync() -> dict[str, Any] | None:

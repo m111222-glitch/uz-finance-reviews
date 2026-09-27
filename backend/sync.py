@@ -6,7 +6,7 @@ import json
 import traceback
 from typing import Any
 
-from backend import db
+from backend import db, releases
 from backend.scrapers import appstore, huawei, play, xiaomi
 
 
@@ -30,6 +30,7 @@ def sync_all(
         "ios_reviews": 0,
         "huawei_reviews": 0,
         "xiaomi_reviews": 0,
+        "new_releases": 0,
         "errors": [],
     }
 
@@ -153,6 +154,11 @@ def sync_all(
                     except Exception as exc:
                         stats["errors"].append(f"{slug}/xiaomi: {exc}")
 
+                try:
+                    stats["new_releases"] += releases.record_from_meta(slug, meta_blob)
+                except Exception as exc:
+                    stats["errors"].append(f"{slug}/releases: {exc}")
+
                 db.update_app_meta(
                     slug,
                     icon_url=icon_url,
@@ -171,6 +177,11 @@ def sync_all(
         except Exception as exc:
             stats["errors"].append(f"telegram: {exc}")
             stats["telegram"] = {"failed": 1, "errors": [str(exc)]}
+
+        try:
+            stats["telegram_releases"] = releases.post_new_releases()
+        except Exception as exc:
+            stats["errors"].append(f"telegram-releases: {exc}")
 
         db.finish_sync_run(run_id, status="ok", stats=stats)
         stats["run_id"] = run_id
