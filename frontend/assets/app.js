@@ -383,49 +383,42 @@ const STORE_ID_FIELD = { play: "play_id", ios: "ios_id", huawei: "huawei_id", xi
 
 const rating2 = (v) => (v != null ? Number(v).toFixed(2) : "—");
 
-// Store ratings are the stores' all-time figures; review counts/average follow the period
-function appMetrics(a, store, inPeriod) {
-  const reviews = (label, n) => [inPeriod ? "Reviews in period" : label, fmt(n, 0), true];
-  const periodAvg = inPeriod ? [["Avg ★ in period", rating2(a.avg_review_rating)]] : [];
-  switch (store) {
-    case "play":
-      return [
-        ["Play rating", rating2(a.play_rating)],
-        ["Play ratings #", fmt(a.play_ratings_count, 0), true],
-        ["Installs", escapeHtml(a.play_installs || "—"), true],
-        reviews("Play reviews", a.play_review_count),
-        ...periodAvg,
-      ];
-    case "ios":
-      return [
-        ["iOS rating", rating2(a.ios_rating)],
-        ["iOS ratings #", fmt(a.ios_ratings_count, 0), true],
-        reviews("iOS reviews", a.ios_review_count),
-        ...periodAvg,
-      ];
-    case "huawei":
-      return [
-        ["Huawei rating", rating2(a.huawei_rating)],
-        reviews("Huawei reviews", a.huawei_review_count),
-        ...periodAvg,
-      ];
-    case "xiaomi":
-      return [
-        ["Xiaomi rating", rating2(a.xiaomi_rating)],
-        reviews("Xiaomi reviews", a.xiaomi_review_count),
-        ...periodAvg,
-      ];
-    default:
-      return [
-        ["Play rating", rating2(a.play_rating)],
-        ["iOS rating", rating2(a.ios_rating)],
-        ["Play ratings #", fmt(a.play_ratings_count, 0), true],
-        ["iOS ratings #", fmt(a.ios_ratings_count, 0), true],
-        ["Installs", escapeHtml(a.play_installs || "—"), true],
-        reviews("Scraped reviews", a.review_count),
-        ...periodAvg,
-      ];
-  }
+// Play and App Store ratings averaged, weighted by how many ratings each store has
+function combinedRating(a) {
+  const parts = [[a.play_rating, a.play_ratings_count], [a.ios_rating, a.ios_ratings_count]].filter(([r]) => r > 0);
+  if (!parts.length) return null;
+  const weight = parts.reduce((s, [, n]) => s + (n || 0), 0);
+  return weight
+    ? parts.reduce((s, [r, n]) => s + r * (n || 0), 0) / weight
+    : parts.reduce((s, [r]) => s + r, 0) / parts.length;
+}
+
+const installsNumber = (v) => (v ? Number(String(v).replace(/\D/g, "")) || null : null);
+
+// Store ratings are the stores' all-time figures; review counts/average follow the period.
+// The first column after App is the default sort (highest first).
+function appColumns(store, inPeriod) {
+  const num = (label, get, title) => ({ label, title, get, render: (a) => fmt(get(a), 0), mono: true });
+  const stars = (label, get, title) => ({ label, title, get: (a) => (get(a) > 0 ? get(a) : null), render: (a) => rating2(get(a) > 0 ? get(a) : null) });
+  const reviews = (get) => num(inPeriod ? "Reviews in period" : "Reviews", get);
+  const tail = inPeriod ? [stars("Avg ★ in period", (a) => a.avg_review_rating, "Average of reviews written in the selected period")] : [];
+  const byStore = {
+    play: [stars("Play ★", (a) => a.play_rating), num("Play ratings", (a) => a.play_ratings_count),
+      { label: "Installs", get: (a) => installsNumber(a.play_installs), render: (a) => escapeHtml(a.play_installs || "—"), mono: true },
+      reviews((a) => a.play_review_count)],
+    ios: [stars("iOS ★", (a) => a.ios_rating), num("iOS ratings", (a) => a.ios_ratings_count), reviews((a) => a.ios_review_count)],
+    huawei: [stars("Huawei ★", (a) => a.huawei_rating), reviews((a) => a.huawei_review_count)],
+    xiaomi: [stars("Xiaomi ★", (a) => a.xiaomi_rating), reviews((a) => a.xiaomi_review_count)],
+  };
+  const all = [
+    stars("Rating", combinedRating, "Play and App Store ratings, weighted by number of ratings"),
+    stars("Play ★", (a) => a.play_rating),
+    stars("iOS ★", (a) => a.ios_rating),
+    num("Ratings", (a) => (a.play_ratings_count || 0) + (a.ios_ratings_count || 0) || null, "Play + App Store ratings"),
+    { label: "Installs", get: (a) => installsNumber(a.play_installs), render: (a) => escapeHtml(a.play_installs || "—"), mono: true },
+    reviews((a) => a.review_count),
+  ];
+  return [...(byStore[store] || all), ...tail];
 }
 
 async function loadApps() {
@@ -452,26 +445,48 @@ function renderApps(apps) {
         (a.slug || "").toLowerCase().includes(q))
   );
 
-  $("#appsGrid").innerHTML = filtered
-    .map((a) => {
-      const icon = a.icon_url
-        ? `<img class="app-icon" src="${escapeHtml(a.icon_url)}" alt="" />`
-        : `<div class="app-icon"></div>`;
-      const metrics = appMetrics(a, store, inPeriod)
-        .map(([k, v, mono]) => `<div class="metric"><div class="k">${k}</div><div class="v${mono ? " mono" : ""}">${v}</div></div>`)
-        .join("");
-      return `<article class="app-card">
-        <div class="app-card-top">
-          ${icon}
-          <div>
-            <div class="app-name">${escapeHtml(a.name)}</div>
-            <div class="app-brand">${escapeHtml(a.brand || a.slug)}</div>
-          </div>
-        </div>
-        <div class="app-metrics">${metrics}</div>
-      </article>`;
-    })
-    .join("") || `<div class="empty">No apps match</div>`;
+  const cols = appColumns(store, inPeriod);
+  // Sorting defaults to the first rating column, highest first; a store change resets it
+  const s = state.appsSort;
+  if (!s || s.store !== store || (s.col !== "name" && !cols[s.col])) {
+    state.appsSort = { store, col: 0, dir: -1 };
+  }
+  const { col, dir } = state.appsSort;
+  const key = (a) => (col === "name" ? (a.name || "").toLowerCase() : cols[col].get(a));
+  const rows = filtered.slice().sort((x, y) => {
+    const a = key(x), b = key(y);
+    if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1; // missing values always last
+    return (a < b ? -1 : a > b ? 1 : 0) * dir;
+  });
+
+  const arrow = (c) => (col === c ? (dir < 0 ? " ▼" : " ▲") : "");
+  $("#appsTable thead").innerHTML = `<tr>
+    <th>#</th>
+    <th class="sortable" data-sort="name">App${arrow("name")}</th>
+    ${cols.map((c, i) => `<th class="sortable" data-sort="${i}"${c.title ? ` title="${escapeHtml(c.title)}"` : ""}>${c.label}${arrow(i)}</th>`).join("")}
+  </tr>`;
+  $("#appsTable tbody").innerHTML = rows.length
+    ? rows.map((a, i) => {
+        const icon = a.icon_url
+          ? `<img class="app-icon" src="${escapeHtml(a.icon_url)}" alt="" />`
+          : `<span class="app-icon"></span>`;
+        return `<tr>
+          <td class="mono muted">${i + 1}</td>
+          <td><div class="app-cell">${icon}<div><div class="app-name">${escapeHtml(a.name)}</div><div class="app-brand">${escapeHtml(a.brand || a.slug)}</div></div></div></td>
+          ${cols.map((c) => `<td${c.mono ? ' class="mono"' : ""}>${c.render(a)}</td>`).join("")}
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="${cols.length + 2}" class="empty">No apps match</td></tr>`;
+}
+
+function sortApps(e) {
+  const th = e.target.closest("th[data-sort]");
+  if (!th) return;
+  const col = th.dataset.sort === "name" ? "name" : Number(th.dataset.sort);
+  const s = state.appsSort;
+  // New column: ratings/numbers start highest-first, names A→Z; same column flips direction
+  state.appsSort = { ...s, col, dir: s.col === col ? -s.dir : col === "name" ? 1 : -1 };
+  renderApps(state.apps);
 }
 
 function fillAppFilters(apps) {
@@ -599,6 +614,7 @@ function wire() {
   );
   $("#appSearch").addEventListener("input", () => renderApps(state.apps));
   $("#apApp").addEventListener("change", () => renderApps(state.apps));
+  $("#appsTable thead").addEventListener("click", sortApps);
   $("#apStore").addEventListener("change", () => loadApps().catch((e) => toast(e.message)));
   wirePeriod("ap", () => loadApps().catch((e) => toast(e.message)));
   ["#ovApp", "#ovStore"].forEach((sel) =>

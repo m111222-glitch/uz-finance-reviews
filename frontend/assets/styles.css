@@ -103,7 +103,8 @@ a { color: var(--primary); }
 .sync-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .sync-status { font-size: 13px; margin-bottom: 12px; font-family: var(--mono); }
 
-.main { padding: 28px 32px 48px; max-width: 1400px; }
+/* min-width: 0 lets wide tables scroll inside their card instead of widening the page */
+.main { padding: 28px 32px 48px; max-width: 1400px; min-width: 0; }
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -276,45 +277,20 @@ a { color: var(--primary); }
 .date-range { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .date-range[hidden] { display: none; }
 
-.apps-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-}
-.app-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: var(--shadow);
-}
-.app-card-top { display: flex; gap: 12px; align-items: center; }
+.app-cell { display: flex; gap: 10px; align-items: center; min-width: 160px; }
 .app-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--bg-soft);
   object-fit: cover;
   border: 1px solid var(--border);
 }
 .app-name { font-weight: 700; }
 .app-brand { color: var(--muted); font-size: 12px; }
-.app-metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.metric {
-  background: var(--bg-elev);
-  border-radius: 10px;
-  padding: 10px;
-  border: 1px solid var(--border);
-}
-.metric .k { font-size: 11px; color: var(--muted); }
-.metric .v { font-weight: 700; margin-top: 2px; }
+.table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.table th.sortable:hover { color: var(--text); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
