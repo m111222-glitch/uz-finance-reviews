@@ -363,6 +363,14 @@
       "play_id": "uz.mobilex.hamroh",
       "ios_id": "6745878978",
       "ios_bundle": "uz.mobilex.hamroh"
+    },
+    {
+      "slug": "uzum-avto",
+      "name": "Uzum Avto",
+      "brand": "Uzum",
+      "play_id": "uz.uzum.avto.android",
+      "ios_id": "6451148480",
+      "ios_bundle": "uz.uzum.avto"
     }
   ],
   "release_only_apps": [
@@ -422,30 +430,6 @@
       "name": "Olcha",
       "play_id": "com.olcha.ecommerce",
       "ios_id": "1551492785"
-    },
-    {
-      "slug": "saferoad",
-      "name": "SafeRoad YHXX",
-      "play_id": "uz.autodoc.saferoad24",
-      "ios_id": "6737189411"
-    },
-    {
-      "slug": "road24",
-      "name": "Road24",
-      "play_id": "uz.kashapp.road24jarimalar",
-      "ios_id": "1543010525"
-    },
-    {
-      "slug": "road24-pro",
-      "name": "Road24 Pro",
-      "play_id": "uz.road.yordam24.pro",
-      "ios_id": "6756430931"
-    },
-    {
-      "slug": "hamroh",
-      "name": "Hamroh",
-      "play_id": "uz.mobilex.hamroh",
-      "ios_id": "6745878978"
     }
   ]
 }
