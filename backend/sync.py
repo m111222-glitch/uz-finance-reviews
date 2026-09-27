@@ -7,7 +7,7 @@ import traceback
 from typing import Any
 
 from backend import db, releases
-from backend.scrapers import appstore, huawei, play, xiaomi
+from backend.scrapers import appstore, huawei, play, play_console, xiaomi
 
 
 def sync_all(
@@ -90,6 +90,20 @@ def sync_all(
                         stats["play_reviews"] += len(previews)
                     except Exception as exc:
                         stats["errors"].append(f"{slug}/play: {exc}")
+
+                # Apps we manage: the Developer API adds device details, plus
+                # reviews the public listing hides (last 7 days only)
+                if app.get("play_id") and app.get("play_console") and play_console.enabled():
+                    try:
+                        crows = play_console.fetch_reviews(app["play_id"], slug)
+                        known = db.existing_review_ids([r["id"] for r in crows])
+                        db.upsert_reviews(crows)
+                        pc = stats.setdefault("play_console", {"fetched": 0, "matched": 0, "new": 0})
+                        pc["fetched"] += len(crows)
+                        pc["matched"] += len(known)
+                        pc["new"] += len(crows) - len(known)
+                    except Exception as exc:
+                        stats["errors"].append(f"{slug}/play-console: {exc}")
 
                 if app.get("ios_id"):
                     try:

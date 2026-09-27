@@ -138,6 +138,9 @@ def init_db() -> None:
         # iOS rows saved before this column kept the storefront code in `language`
         _ensure_column(conn, "reviews", "country", "TEXT")
         conn.execute("UPDATE reviews SET country = language WHERE store = 'ios' AND country IS NULL")
+        # Only known for apps whose Play Console we can read via the Developer API
+        for col in ("device", "device_class", "os_version"):
+            _ensure_column(conn, "reviews", col, "TEXT")
 
 
 # One row per store build we've seen; release_key is the version, or the
@@ -323,8 +326,9 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
                 """
                 INSERT INTO reviews (
                     id, app_slug, store, author, rating, title, body,
-                    language, version, thumbs_up, review_date, scraped_at, raw_json, country
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    language, version, thumbs_up, review_date, scraped_at, raw_json, country,
+                    device, device_class, os_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     rating = excluded.rating,
                     title = excluded.title,
@@ -332,7 +336,10 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
                     thumbs_up = excluded.thumbs_up,
                     scraped_at = excluded.scraped_at,
                     raw_json = excluded.raw_json,
-                    country = COALESCE(reviews.country, excluded.country)
+                    country = COALESCE(reviews.country, excluded.country),
+                    device = COALESCE(excluded.device, reviews.device),
+                    device_class = COALESCE(excluded.device_class, reviews.device_class),
+                    os_version = COALESCE(excluded.os_version, reviews.os_version)
                 """,
                 (
                     r["id"],
@@ -349,10 +356,22 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
                     r.get("scraped_at") or utcnow(),
                     r.get("raw_json"),
                     r.get("country"),
+                    r.get("device"),
+                    r.get("device_class"),
+                    r.get("os_version"),
                 ),
             )
             inserted += cur.rowcount
     return inserted
+
+
+def existing_review_ids(ids: list[str]) -> set[str]:
+    if not ids:
+        return set()
+    with connect() as conn:
+        placeholders = ",".join("?" * len(ids))
+        rows = conn.execute(f"SELECT id FROM reviews WHERE id IN ({placeholders})", ids)
+        return {row[0] for row in rows}
 
 
 def get_apps(

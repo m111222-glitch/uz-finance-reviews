@@ -227,9 +227,11 @@ def format_message(review: dict[str, Any]) -> str:
         f"<b>{_esc(app)}</b>  {stars} · {tag}",
         f"{store} · {_esc(author)} · {date}"
         + (f" · v{_esc(version)}" if version else ""),
-        "",
-        _esc(text),
     ]
+    device = device_summary(review)
+    if device:
+        lines.append(f"📱 {_esc(device)}")
+    lines += ["", _esc(text)]
     console_url = db.console_review_url(review)
     if console_url:
         lines += ["", f'🔗 <a href="{_esc(console_url)}">Open in Play Console</a>']
@@ -237,6 +239,14 @@ def format_message(review: dict[str, Any]) -> str:
     if hashtag:
         lines += ["", hashtag]
     return "\n".join(lines)
+
+
+def device_summary(review: dict[str, Any]) -> str:
+    parts = [review.get("device"), review.get("os_version")]
+    kind = review.get("device_class")
+    if kind and kind != "phone":
+        parts.insert(0, kind.capitalize())
+    return " · ".join(p for p in parts if p)
 
 
 def country_flag(code: str | None) -> str:

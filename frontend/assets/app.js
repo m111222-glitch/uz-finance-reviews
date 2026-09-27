@@ -32,6 +32,14 @@ function stars(n) {
   return "★".repeat(Math.max(0, Math.min(5, r))) + "☆".repeat(Math.max(0, 5 - r));
 }
 
+function deviceSummary(r) {
+  const parts = [r.device, r.os_version];
+  if (r.device_class && r.device_class !== "phone") {
+    parts.unshift(r.device_class[0].toUpperCase() + r.device_class.slice(1));
+  }
+  return parts.filter(Boolean).join(" · ");
+}
+
 function countryFlag(code) {
   if (!/^[a-z]{2}$/i.test(code || "")) return "";
   const cc = code.toUpperCase();
@@ -296,6 +304,7 @@ function reviewCard(r) {
       <span>${escapeHtml(r.author || "Anonymous")}</span>
       <span class="mono">${escapeHtml(date)}</span>
       ${r.version ? `<span class="mono">v${escapeHtml(r.version)}</span>` : ""}
+      ${deviceSummary(r) ? `<span>📱 ${escapeHtml(deviceSummary(r))}</span>` : ""}
       ${r.console_url ? `<a class="review-link" href="${escapeHtml(r.console_url)}" target="_blank" rel="noopener">Open in Play Console ↗</a>` : ""}
     </div>
     ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ""}
