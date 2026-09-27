@@ -10,7 +10,11 @@
       "play_id": "tj.alif.mobi",
       "ios_id": "1331374853",
       "ios_bundle": "tj.alif.mobi",
-      "ios_countries": ["uz", "tj", "ru", "us"]
+      "ios_countries": ["uz", "tj", "ru", "us"],
+      "play_console": {
+        "developer_id": "8828065338941423741",
+        "app_id": "4972306327806446195"
+      }
     },
     {
       "slug": "payme",

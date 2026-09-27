@@ -230,6 +230,9 @@ def format_message(review: dict[str, Any]) -> str:
         "",
         _esc(text),
     ]
+    console_url = db.console_review_url(review)
+    if console_url:
+        lines += ["", f'🔗 <a href="{_esc(console_url)}">Open in Play Console</a>']
     hashtag = APP_HASHTAGS.get(review.get("app_slug") or "")
     if hashtag:
         lines += ["", hashtag]

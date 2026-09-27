@@ -7,8 +7,10 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
@@ -243,6 +245,32 @@ def load_catalog() -> dict[str, Any]:
         return json.load(f)
 
 
+@lru_cache(maxsize=1)
+def _play_console_apps() -> dict[str, dict[str, str]]:
+    return {a["slug"]: a["play_console"] for a in load_catalog()["apps"] if a.get("play_console")}
+
+
+def console_review_url(review: dict[str, Any]) -> str | None:
+    """Play Console page for a review of an app we manage (catalog `play_console`)."""
+    if review.get("store") != "play":
+        return None
+    ids = _play_console_apps().get(review.get("app_slug") or "")
+    review_id = (review.get("id") or "").removeprefix("play:")
+    if not ids or not review_id:
+        return None
+    return (
+        f"https://play.google.com/console/u/0/developers/{ids['developer_id']}"
+        f"/app/{ids['app_id']}/user-feedback/review-details"
+        f"?reviewId={quote(review_id)}&corpus=PUBLIC_REVIEWS"
+    )
+
+
+def _with_console_urls(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for r in rows:
+        r["console_url"] = console_review_url(r)
+    return rows
+
+
 def upsert_apps_from_catalog() -> int:
     catalog = load_catalog()
     count = 0
@@ -408,7 +436,7 @@ def query_reviews(
             """,
             params + [limit, offset],
         ).fetchall()
-        return [dict(row) for row in rows], total
+        return _with_console_urls([dict(row) for row in rows]), total
 
 
 def dashboard_stats(
@@ -530,7 +558,7 @@ def dashboard_stats(
         "rating_distribution": [dict(r) for r in rating_dist],
         "by_app": [dict(r) for r in by_app],
         "timeline": list(reversed([dict(r) for r in timeline])),
-        "recent_reviews": [dict(r) for r in recent],
+        "recent_reviews": _with_console_urls([dict(r) for r in recent]),
         "keyword_sample": [dict(r) for r in keywords],
         "last_sync": dict(last_sync) if last_sync else None,
         "app_count": len(by_app),
