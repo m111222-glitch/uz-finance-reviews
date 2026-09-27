@@ -107,6 +107,7 @@ def sync_all(
                             app["ios_id"],
                             slug,
                             country=country,
+                            countries=app.get("ios_countries"),
                             pages=ios_pages,
                         )
                         db.upsert_reviews(ireviews)

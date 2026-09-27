@@ -132,6 +132,10 @@ def init_db() -> None:
             ("xiaomi_rating", "REAL"),
         ):
             _ensure_column(conn, "apps", col, decl)
+        # App Store reviews come from per-country storefronts (Play exposes no country);
+        # iOS rows saved before this column kept the storefront code in `language`
+        _ensure_column(conn, "reviews", "country", "TEXT")
+        conn.execute("UPDATE reviews SET country = language WHERE store = 'ios' AND country IS NULL")
 
 
 # One row per store build we've seen; release_key is the version, or the
@@ -291,15 +295,16 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
                 """
                 INSERT INTO reviews (
                     id, app_slug, store, author, rating, title, body,
-                    language, version, thumbs_up, review_date, scraped_at, raw_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    language, version, thumbs_up, review_date, scraped_at, raw_json, country
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     rating = excluded.rating,
                     title = excluded.title,
                     body = excluded.body,
                     thumbs_up = excluded.thumbs_up,
                     scraped_at = excluded.scraped_at,
-                    raw_json = excluded.raw_json
+                    raw_json = excluded.raw_json,
+                    country = COALESCE(reviews.country, excluded.country)
                 """,
                 (
                     r["id"],
@@ -315,6 +320,7 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
                     r.get("review_date"),
                     r.get("scraped_at") or utcnow(),
                     r.get("raw_json"),
+                    r.get("country"),
                 ),
             )
             inserted += cur.rowcount

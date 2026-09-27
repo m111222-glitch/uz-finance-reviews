@@ -210,6 +210,9 @@ def format_message(review: dict[str, Any]) -> str:
         "huawei": "AppGallery",
         "xiaomi": "GetApps",
     }.get(review.get("store") or "", review.get("store") or "Store")
+    flag = country_flag(review.get("country"))
+    if flag:
+        store = f"{store} {flag}"
     app = review.get("app_name") or review.get("app_slug") or "App"
     author = review.get("author") or "Anonymous"
     date = _tashkent_date(review.get("review_date") or review.get("scraped_at"))
@@ -231,6 +234,13 @@ def format_message(review: dict[str, Any]) -> str:
     if hashtag:
         lines += ["", hashtag]
     return "\n".join(lines)
+
+
+def country_flag(code: str | None) -> str:
+    code = (code or "").strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        return ""
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code)
 
 
 def _tashkent_date(value: str | None) -> str:

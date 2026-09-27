@@ -32,6 +32,13 @@ function stars(n) {
   return "★".repeat(Math.max(0, Math.min(5, r))) + "☆".repeat(Math.max(0, 5 - r));
 }
 
+function countryFlag(code) {
+  if (!/^[a-z]{2}$/i.test(code || "")) return "";
+  const cc = code.toUpperCase();
+  const flag = [...cc].map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)).join("");
+  return `<span title="App Store ${cc}">${flag}</span>`;
+}
+
 function storeBadge(store) {
   if (store === "play") return `<span class="badge play">Play</span>`;
   if (store === "ios") return `<span class="badge ios">iOS</span>`;
@@ -284,6 +291,7 @@ function reviewCard(r) {
     <div class="review-meta">
       <strong style="color:var(--text)">${escapeHtml(r.app_name || r.app_slug)}</strong>
       ${storeBadge(r.store)}
+      ${countryFlag(r.country)}
       <span class="stars" title="${r.rating}★">${stars(r.rating)}</span>
       <span>${escapeHtml(r.author || "Anonymous")}</span>
       <span class="mono">${escapeHtml(date)}</span>

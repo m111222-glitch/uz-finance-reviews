@@ -9,7 +9,8 @@
       "brand": "Alif",
       "play_id": "tj.alif.mobi",
       "ios_id": "1331374853",
-      "ios_bundle": "tj.alif.mobi"
+      "ios_bundle": "tj.alif.mobi",
+      "ios_countries": ["uz", "tj", "ru", "us"]
     },
     {
       "slug": "payme",

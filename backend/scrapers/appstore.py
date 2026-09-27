@@ -86,17 +86,19 @@ def fetch_ios_reviews(
     app_slug: str,
     *,
     country: str = "uz",
+    countries: list[str] | None = None,
     pages: int = 5,
 ) -> list[dict[str, Any]]:
     """Fetch up to `pages` pages of most-recent reviews from Apple RSS.
 
     Apple RSS returns ~50 reviews per page, max 10 pages.
-    Country code filters reviews shown for that storefront.
+    Each storefront only lists reviews written in that country.
     """
     scraped_at = datetime.now(timezone.utc).isoformat()
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    countries = [country, "ru", "us"] if country != "us" else ["us"]
+    if not countries:
+        countries = [country, "ru", "us"] if country != "us" else ["us"]
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         for store_country in countries:
@@ -155,6 +157,7 @@ def fetch_ios_reviews(
                             "title": title,
                             "body": body,
                             "language": store_country,
+                            "country": store_country,
                             "version": version,
                             "thumbs_up": 0,
                             "review_date": _iso_from_rss(updated),
