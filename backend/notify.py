@@ -205,11 +205,12 @@ def format_message(review: dict[str, Any]) -> str:
     rating = int(review.get("rating") or 0)
     stars = "⭐" * max(1, min(rating, 5))
     tag = STAR_TAGS.get(rating, f"{rating}★")
+    # Same store emoji as release posts (releases.STORE_NAMES)
     store = {
-        "play": "Play Store",
-        "ios": "App Store",
-        "huawei": "AppGallery",
-        "xiaomi": "GetApps",
+        "play": "🤖 Play Store",
+        "ios": "🍎 App Store",
+        "huawei": "🌺 AppGallery",
+        "xiaomi": "🟧 GetApps",
     }.get(review.get("store") or "", review.get("store") or "Store")
     flag = country_flag(review.get("country"))
     if flag:

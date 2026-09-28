@@ -409,6 +409,14 @@
       "ios_id": "6451148480",
       "ios_bundle": "uz.uzum.avto",
       "tg_emoji": {"id": "5222446053139162266", "emoji": "🏦"}
+    },
+    {
+      "slug": "hambi",
+      "name": "Hambi",
+      "brand": "Beeline",
+      "play_id": "uz.beeline.odp",
+      "ios_id": "722072887",
+      "ios_bundle": "uz.beeline.odp"
     }
   ],
   "release_only_apps": [
