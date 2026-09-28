@@ -143,6 +143,8 @@ def init_db() -> None:
         # Only known for apps whose Play Console we can read via the Developer API
         for col in ("device", "device_class", "os_version"):
             _ensure_column(conn, "reviews", col, "TEXT")
+        # "posted" to the channel, "skipped" as too short; rows before this column were all posted
+        _ensure_column(conn, "telegram_posts", "status", "TEXT NOT NULL DEFAULT 'posted'")
         _infer_missing_countries(conn)
 
 
@@ -604,10 +606,10 @@ def unposted_star_reviews(
     limit: int = 80,
 ) -> list[dict[str, Any]]:
     placeholders = ",".join("?" * len(ratings))
+    # Short and empty reviews are included on purpose: the caller skips them for the
+    # channel but records them, so the daily recap still counts their ratings
     clauses = [
         f"r.rating IN ({placeholders})",
-        "r.body IS NOT NULL",
-        "length(trim(r.body)) >= 20",
         "t.review_id IS NULL",
     ]
     params: list[Any] = list(ratings)
@@ -631,33 +633,6 @@ def unposted_star_reviews(
         return [dict(row) for row in rows]
 
 
-def reviews_in_range(
-    *,
-    start_iso: str,
-    end_iso: str,
-    slugs: list[str] | tuple[str, ...] | None = None,
-) -> list[dict[str, Any]]:
-    clauses = ["COALESCE(r.review_date, r.scraped_at) >= ?", "COALESCE(r.review_date, r.scraped_at) < ?"]
-    params: list[Any] = [start_iso, end_iso]
-    if slugs:
-        placeholders = ",".join("?" * len(slugs))
-        clauses.append(f"r.app_slug IN ({placeholders})")
-        params.extend(slugs)
-    where = " AND ".join(clauses)
-    with connect() as conn:
-        rows = conn.execute(
-            f"""
-            SELECT r.*, a.name AS app_name, a.brand
-            FROM reviews r
-            JOIN apps a ON a.slug = r.app_slug
-            WHERE {where}
-            ORDER BY COALESCE(r.review_date, r.scraped_at) DESC
-            """,
-            params,
-        ).fetchall()
-        return [dict(row) for row in rows]
-
-
 def summary_posted(day: str) -> bool:
     with connect() as conn:
         row = conn.execute(
@@ -677,15 +652,41 @@ def mark_summary_posted(day: str, payload: dict[str, Any] | None = None) -> None
         )
 
 
-def mark_telegram_posted(review_id: str, rating: int | None) -> None:
+def mark_telegram_posted(review_id: str, rating: int | None, *, status: str = "posted") -> None:
+    """Record that a sync saw this review: "posted" to the channel or "skipped" as too short."""
     with connect() as conn:
         conn.execute(
             """
-            INSERT OR IGNORE INTO telegram_posts (review_id, rating, posted_at)
-            VALUES (?, ?, ?)
+            INSERT OR IGNORE INTO telegram_posts (review_id, rating, posted_at, status)
+            VALUES (?, ?, ?, ?)
             """,
-            (review_id, rating, utcnow()),
+            (review_id, rating, utcnow(), status),
         )
+
+
+def reviews_seen_in_range(
+    *, start_iso: str, end_iso: str, slugs: list[str] | tuple[str, ...]
+) -> list[dict[str, Any]]:
+    """Reviews our syncs first saw in the range, whether posted or skipped as too short.
+
+    Stores publish reviews about a day after they're written, so going by when
+    we saw them makes a day complete at midnight.
+    """
+    placeholders = ",".join("?" * len(slugs))
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT r.*, a.name AS app_name, a.brand
+            FROM telegram_posts t
+            JOIN reviews r ON r.id = t.review_id
+            JOIN apps a ON a.slug = r.app_slug
+            WHERE t.posted_at >= ? AND t.posted_at < ?
+              AND t.status IN ('posted', 'skipped')
+              AND r.app_slug IN ({placeholders})
+            """,
+            [start_iso, end_iso, *slugs],
+        ).fetchall()
+        return [dict(row) for row in rows]
 
 
 def record_release(

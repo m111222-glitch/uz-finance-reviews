@@ -196,9 +196,10 @@ PRIORITY_APP_SLUGS = ("alif-mobi",)
 
 SUMMARY_APP_SLUGS = ("alif-mobi", "click", "payme", "paynet", "xazna", "uzum-bank")
 TASHKENT = timezone(timedelta(hours=5))
-# Store feeds publish reviews ~a day late (keeping the original timestamp), so
-# summarising yesterday right after midnight misses most of its reviews.
-SUMMARY_DAYS_BACK = 2
+# The recap counts reviews our syncs saw during the day (posted or skipped as too
+# short), not reviews written that day: stores publish them ~a day late, so a day
+# by writing date isn't complete until the day after. By sighting, it is at midnight.
+SUMMARY_DAYS_BACK = 1
 
 
 def format_message(review: dict[str, Any]) -> str:
@@ -543,7 +544,7 @@ def maybe_post_daily_summary(*, dry_run: bool = False) -> dict[str, Any]:
         return out
     by_slug: dict[str, list[dict[str, Any]]] = {}
     for slug in SUMMARY_APP_SLUGS:
-        by_slug[slug] = db.reviews_in_range(
+        by_slug[slug] = db.reviews_seen_in_range(
             start_iso=start_iso, end_iso=end_iso, slugs=[slug]
         )
     releases = db.releases_in_range(
@@ -595,6 +596,9 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
     for review in rows:
         if not has_context(review):
             stats["skipped_short"] += 1
+            if not dry_run:
+                # Still a real rating: recorded so the daily recap counts it
+                db.mark_telegram_posted(review["id"], review.get("rating"), status="skipped")
             continue
         if dry_run:
             stats["posted"] += 1
