@@ -96,7 +96,7 @@ def sync_release_only_apps(
     apps: list[dict[str, Any]], *, country: str, lang: str
 ) -> dict[str, Any]:
     """Shops etc. we follow for release notes only — no reviews, no dashboard row."""
-    from backend.scrapers import appstore, huawei, play
+    from backend.scrapers import appstore, huawei, play, xiaomi
 
     stats: dict[str, Any] = {"new_releases": 0, "errors": []}
     for app in apps:
@@ -120,6 +120,14 @@ def sync_release_only_apps(
                 meta_blob["huawei"] = huawei.fetch_huawei_meta(app["huawei_id"]).get("meta") or {}
             except Exception as exc:
                 stats["errors"].append(f"{app['slug']}/huawei: {exc}")
+        xiaomi_pkg = app.get("xiaomi_id") or app.get("play_id")
+        if xiaomi_pkg:
+            try:
+                xmeta = xiaomi.fetch_xiaomi_meta(xiaomi_pkg).get("meta") or {}
+                if not xmeta.get("error"):
+                    meta_blob["xiaomi"] = xmeta
+            except Exception as exc:
+                stats["errors"].append(f"{app['slug']}/xiaomi: {exc}")
         try:
             stats["new_releases"] += record_from_meta(
                 app["slug"], meta_blob, app_name=app["name"]
