@@ -417,6 +417,14 @@
       "play_id": "uz.beeline.odp",
       "ios_id": "722072887",
       "ios_bundle": "uz.beeline.odp"
+    },
+    {
+      "slug": "soliq",
+      "name": "Soliq",
+      "brand": "Soliq",
+      "play_id": "uz.soliq.mobile",
+      "ios_id": "1518038410",
+      "ios_bundle": "uz.soliq.mobile"
     }
   ],
   "release_only_apps": [
