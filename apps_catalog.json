@@ -425,6 +425,14 @@
       "play_id": "uz.soliq.mobile",
       "ios_id": "1518038410",
       "ios_bundle": "uz.soliq.mobile"
+    },
+    {
+      "slug": "humo-pay",
+      "name": "HUMO Pay",
+      "brand": "HUMO",
+      "play_id": "com.humo.tech",
+      "ios_id": "6766179398",
+      "ios_bundle": "com.humopay.humopay"
     }
   ],
   "release_only_apps": [
