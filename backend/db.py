@@ -145,6 +145,9 @@ def init_db() -> None:
             _ensure_column(conn, "reviews", col, "TEXT")
         # "posted" to the channel, "skipped" as too short; rows before this column were all posted
         _ensure_column(conn, "telegram_posts", "status", "TEXT NOT NULL DEFAULT 'posted'")
+        # Bulk-review pattern flags (backend.suspicious); suspicion holds the JSON reason codes
+        _ensure_column(conn, "reviews", "suspicious", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "reviews", "suspicion", "TEXT")
         _infer_missing_countries(conn)
 
 
@@ -629,6 +632,49 @@ def unposted_star_reviews(
             LIMIT ?
             """,
             params + [limit],
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def update_suspicion() -> int:
+    """Re-score every review for bulk-review patterns; returns how many are flagged.
+
+    Flags can appear later than the review itself (a campaign builds up over
+    days), so this runs on every sync over all reviews.
+    """
+    from backend import suspicious
+
+    with connect() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, app_slug, store, author, title, body, rating, review_date,"
+                " suspicious, suspicion FROM reviews"
+            )
+        ]
+        scores = suspicious.score_reviews(rows)
+        updates = []
+        for r in rows:
+            s = scores.get(r["id"])
+            flag = int(bool(s and s["flagged"]))
+            codes = json.dumps(s["reasons"]) if flag else None
+            if flag != r["suspicious"] or codes != r["suspicion"]:
+                updates.append((flag, codes, r["id"]))
+        conn.executemany("UPDATE reviews SET suspicious = ?, suspicion = ? WHERE id = ?", updates)
+        return sum(1 for r in rows if (scores.get(r["id"]) or {}).get("flagged"))
+
+
+def reviews_written_in_range(*, start_iso: str, end_iso: str) -> list[dict[str, Any]]:
+    """All apps' reviews by review date, for the weekly bulk-review summary."""
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT r.id, r.app_slug, r.store, r.rating, r.suspicious, r.suspicion, a.name AS app_name
+            FROM reviews r
+            JOIN apps a ON a.slug = r.app_slug
+            WHERE r.review_date >= ? AND r.review_date < ?
+            """,
+            (start_iso, end_iso),
         ).fetchall()
         return [dict(row) for row in rows]
 

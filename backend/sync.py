@@ -196,6 +196,12 @@ def sync_all(
             except Exception as exc:
                 stats["errors"].append(f"release-only apps: {exc}")
 
+        # Before posting, so new reviews already carry their bulk-review flags
+        try:
+            stats["suspicious_reviews"] = db.update_suspicion()
+        except Exception as exc:
+            stats["errors"].append(f"suspicion: {exc}")
+
         try:
             from backend import notify
 

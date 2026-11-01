@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Any
@@ -192,6 +194,27 @@ STAR_TAGS = {
 }
 
 APP_HASHTAGS = {"alif-mobi": "#Alif"}
+
+# Bulk-review signals (backend.suspicious.REASONS), worded neutrally: they're
+# patterns, not proof. First form is for one review, second for the weekly summary.
+SUSPICION_RU = {
+    "generated_name": ("имя похоже на сгенерированное", "имена похожи на сгенерированные"),
+    "name_campaign": ("одно из многих похожих имён за неделю", "много похожих имён за неделю"),
+    "ru_name_uz_text": ("русское имя, текст на узбекском", "русские имена с текстами на узбекском"),
+    "duplicate_text": ("такой же текст у другого автора", "одинаковые тексты у разных авторов"),
+    "burst": ("в пачке отзывов 4–5★ за несколько часов", "пачки отзывов 4–5★ за несколько часов"),
+    "long_praise": ("длинная хвалебная история", "длинные хвалебные истории"),
+    "mixed_title": ("заголовок и текст на разных языках", "заголовки и тексты на разных языках"),
+}
+
+
+def suspicion_codes(review: dict[str, Any]) -> list[str]:
+    if not review.get("suspicious"):
+        return []
+    try:
+        return [c for c in json.loads(review.get("suspicion") or "[]") if c in SUSPICION_RU]
+    except ValueError:
+        return []
 PRIORITY_APP_SLUGS = ("alif-mobi",)
 
 SUMMARY_APP_SLUGS = ("alif-mobi", "click", "payme", "paynet", "xazna", "uzum-bank")
@@ -234,6 +257,9 @@ def format_message(review: dict[str, Any]) -> str:
     device = device_summary(review)
     if device:
         lines.append(f"📱 {_esc(device)}")
+    codes = suspicion_codes(review)
+    if codes:
+        lines.append("⚠️ Признаки массового отзыва: " + ", ".join(SUSPICION_RU[c][0] for c in codes))
     lines += ["", _esc(text)]
     console_url = db.console_review_url(review)
     if console_url:
@@ -479,6 +505,11 @@ def _release_lines(releases: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def _not_counted_line(n: int) -> str:
+    verb = "Не учтён" if _ru_plural(n, "1", "2", "5") == "1" else "Не учтены"
+    return f"⚠️ {verb} {n} {_ru_plural(n, 'отзыв', 'отзыва', 'отзывов')} с признаками массовых"
+
+
 def format_daily_summary(
     day: str,
     by_slug: dict[str, list[dict[str, Any]]],
@@ -487,7 +518,9 @@ def format_daily_summary(
     d = datetime.fromisoformat(day).date()
     apps = []
     for slug in SUMMARY_APP_SLUGS:
-        rows = [r for r in by_slug.get(slug) or [] if r.get("rating") in (1, 2, 3, 4, 5)]
+        all_rows = [r for r in by_slug.get(slug) or [] if r.get("rating") in (1, 2, 3, 4, 5)]
+        # Reviews matching a bulk-review pattern are left out of counts and averages
+        rows = [r for r in all_rows if not r.get("suspicious")]
         counts = {n: sum(1 for r in rows if r["rating"] == n) for n in range(1, 6)}
         avg = sum(n * c for n, c in counts.items()) / len(rows) if rows else None
         apps.append({
@@ -497,6 +530,7 @@ def format_daily_summary(
             "counts": counts,
             "avg": avg,
             "negatives": counts[1] + counts[2],
+            "not_counted": len(all_rows) - len(rows),
         })
     # Highest average first; apps with no reviews that day go last
     apps.sort(key=lambda a: (a["avg"] is None, -(a["avg"] or 0), -len(a["rows"])))
@@ -510,14 +544,16 @@ def format_daily_summary(
     ]
     for a in apps:
         name = _esc(a["name"])
+        flagged = [_not_counted_line(a["not_counted"])] if a["not_counted"] else []
         if a["avg"] is None:
-            lines += [f"⚪ {app_emoji(a['slug'])}<b>{name}</b> — нет отзывов", ""]
+            lines += [f"⚪ {app_emoji(a['slug'])}<b>{name}</b> — нет отзывов", *flagged, ""]
             continue
         n = len(a["rows"])
         score = f"{a['avg']:.2f}".replace(".", ",")
         lines += [
             f"{_rating_marker(a['avg'])} {app_emoji(a['slug'])}<b>{name}</b> — {score} ★",
             f"{n} {_ru_plural(n, 'отзыв', 'отзыва', 'отзывов')} · негативных: {a['negatives']}",
+            *flagged,
             *_complaint_lines(a["rows"]),
             "",
         ]
@@ -565,6 +601,92 @@ def maybe_post_daily_summary(*, dry_run: bool = False) -> dict[str, Any]:
     send_message(text)
     db.mark_summary_posted(day, {"counts": {s: len(v) for s, v in by_slug.items()}})
     out["posted"] = True
+    return out
+
+
+WEEKLY_MIN_FLAGGED = 2  # one flagged review is too little to call a pattern
+STORE_LABELS = {"ios": "🍎 App Store", "play": "🤖 Google Play", "huawei": "🌺 AppGallery", "xiaomi": "🟧 GetApps"}
+
+
+def _avg_text(rows: list[dict[str, Any]]) -> str:
+    rated = [r["rating"] for r in rows if r.get("rating") in (1, 2, 3, 4, 5)]
+    return f"{sum(rated) / len(rated):.2f}".replace(".", ",") if rated else "—"
+
+
+def format_weekly_suspicion(start: datetime, end: datetime, groups: list[dict[str, Any]]) -> str:
+    last = end - timedelta(days=1)
+    tail = f"{last.day} {RU_MONTHS[last.month - 1]} {last.year}"
+    period = f"{start.day}–{tail}" if start.month == last.month else f"{start.day} {RU_MONTHS[start.month - 1]} – {tail}"
+    lines = [
+        "⚠️ <b>Необычные отзывы за неделю</b>",
+        f"{period} · Ташкент",
+        "",
+    ]
+    for g in groups:
+        reasons = ", ".join(SUSPICION_RU[c][1] for c, _ in g["reasons"].most_common(2))
+        lines += [
+            f"{app_emoji(g['slug'])}<b>{_esc(g['name'])}</b> · {STORE_LABELS.get(g['store'], g['store'])}",
+            f"{g['flagged']} из {g['positive']} {_ru_plural(g['positive'], 'отзыва', 'отзывов', 'отзывов')} 4–5★ "
+            f"с признаками массовых: {reasons}.",
+            f"Средняя без них: {g['avg_without']} ★ вместо {g['avg_all']} ★",
+            "",
+        ]
+    lines.append("<i>Признаки определяются автоматически и не являются доказательством.</i>")
+    return "\n".join(lines)
+
+
+def maybe_post_weekly_suspicion(*, dry_run: bool = False) -> dict[str, Any]:
+    """Tuesdays on: last Monday–Sunday's bulk-review patterns, by review date.
+
+    Waiting until Tuesday gives the week's last reviews the ~day stores take to publish them.
+    """
+    today = datetime.now(TASHKENT).date()
+    out: dict[str, Any] = {"posted": False, "skipped": False}
+    if today.weekday() == 0:
+        out["skipped"] = True
+        return out
+    week_start = today - timedelta(days=today.weekday() + 7)
+    key = f"week-{week_start.isoformat()}"
+    out["week"] = week_start.isoformat()
+    if db.summary_posted(key):
+        out["skipped"] = True
+        return out
+    start = datetime(week_start.year, week_start.month, week_start.day, tzinfo=TASHKENT)
+    end = start + timedelta(days=7)
+    rows = db.reviews_written_in_range(
+        start_iso=start.astimezone(timezone.utc).isoformat(),
+        end_iso=end.astimezone(timezone.utc).isoformat(),
+    )
+    by_group: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for r in rows:
+        by_group.setdefault((r["app_slug"], r["store"]), []).append(r)
+    groups = []
+    for (slug, store), items in by_group.items():
+        flagged = [r for r in items if r.get("suspicious")]
+        if len(flagged) < WEEKLY_MIN_FLAGGED:
+            continue
+        reasons: Counter[str] = Counter(c for r in flagged for c in suspicion_codes(r))
+        groups.append({
+            "slug": slug,
+            "store": store,
+            "name": items[0]["app_name"],
+            "flagged": len(flagged),
+            "positive": sum(1 for r in items if r.get("rating") in (4, 5)),
+            "reasons": reasons,
+            "avg_all": _avg_text(items),
+            "avg_without": _avg_text([r for r in items if not r.get("suspicious")]),
+        })
+    groups.sort(key=lambda g: (-g["flagged"] / max(g["positive"], 1), -g["flagged"]))
+    out["apps"] = len(groups)
+    if groups:
+        out["preview"] = format_weekly_suspicion(start, end, groups)
+    if dry_run or not enabled():
+        return out
+    if groups:
+        send_message(out["preview"])
+        out["posted"] = True
+    # Marked even when there was nothing to report, so it isn't re-checked all week
+    db.mark_summary_posted(key, {"apps": {f"{g['slug']}/{g['store']}": g["flagged"] for g in groups}})
     return out
 
 
@@ -621,4 +743,8 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
         stats["summary"] = maybe_post_daily_summary(dry_run=dry_run)
     except Exception as exc:
         stats["summary"] = {"posted": False, "error": _redact(str(exc))}
+    try:
+        stats["weekly_suspicion"] = maybe_post_weekly_suspicion(dry_run=dry_run)
+    except Exception as exc:
+        stats["weekly_suspicion"] = {"posted": False, "error": _redact(str(exc))}
     return stats
