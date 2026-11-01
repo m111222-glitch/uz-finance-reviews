@@ -142,7 +142,7 @@ def _hashtag(slug: str) -> str:
     return "#" + slug.replace("-", "_")
 
 
-def format_release(rel: dict[str, Any], *, same_notes_as: str | None = None) -> str:
+def format_release(rel: dict[str, Any]) -> str:
     app = rel.get("display_name") or rel.get("app_name") or rel["app_slug"]
     store = STORE_NAMES.get(rel["store"], rel["store"])
     version = rel.get("version")
@@ -152,9 +152,7 @@ def format_release(rel: dict[str, Any], *, same_notes_as: str | None = None) -> 
     date = notify._tashkent_date(rel.get("released_at") or rel.get("first_seen_at"))
     lines = [head, f"{store} · {date}", ""]
     notes = (rel.get("notes") or "").strip()
-    if same_notes_as:
-        lines.append(f"Те же изменения, что и в {same_notes_as}.")
-    elif notes:
+    if notes:
         if len(notes) > 1500:
             notes = notes[:1490] + "…"
         lines.append(notify._esc(notes))
@@ -170,13 +168,7 @@ def post_new_releases(*, dry_run: bool = False) -> dict[str, Any]:
         return stats
     previews = []
     for rel in db.unposted_releases():
-        same = None
-        if rel.get("version"):
-            for other in db.posted_release_notes(rel["app_slug"], rel["version"]):
-                if other["store"] != rel["store"] and (other["notes"] or "") == (rel["notes"] or ""):
-                    same = STORE_NAMES.get(other["store"], other["store"]).split(" ", 1)[-1]
-                    break
-        text = format_release(rel, same_notes_as=same)
+        text = format_release(rel)
         if dry_run:
             previews.append(text)
             continue

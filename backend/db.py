@@ -758,20 +758,6 @@ def unposted_releases(limit: int = 50) -> list[dict[str, Any]]:
         return [dict(row) for row in rows]
 
 
-def posted_release_notes(slug: str, version: str) -> list[dict[str, Any]]:
-    """Other stores' already-posted builds of the same version (to skip repeat notes)."""
-    with connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT store, notes FROM app_releases
-            WHERE app_slug = ? AND version = ? AND posted_at IS NOT NULL
-              AND posted_at != 'baseline'
-            """,
-            (slug, version),
-        ).fetchall()
-        return [dict(row) for row in rows]
-
-
 def mark_release_posted(slug: str, store: str, release_key: str) -> None:
     with connect() as conn:
         conn.execute(
