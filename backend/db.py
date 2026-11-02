@@ -804,6 +804,38 @@ def unposted_releases(limit: int = 50) -> list[dict[str, Any]]:
         return [dict(row) for row in rows]
 
 
+def store_releases(slug: str, store: str) -> list[dict[str, Any]]:
+    """Every dated build of an app on one store, oldest first."""
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT version, released_at FROM app_releases
+            WHERE app_slug = ? AND store = ? AND released_at IS NOT NULL
+            ORDER BY released_at
+            """,
+            (slug, store),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def earliest_release_seen() -> str | None:
+    with connect() as conn:
+        row = conn.execute("SELECT MIN(first_seen_at) FROM app_releases").fetchone()
+        return row[0] if row else None
+
+
+def negative_reviews_on_version(slug: str, store: str, version: str) -> int:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) FROM reviews
+            WHERE app_slug = ? AND store = ? AND version = ? AND rating IN (1, 2)
+            """,
+            (slug, store, version),
+        ).fetchone()
+        return row[0]
+
+
 def mark_release_posted(slug: str, store: str, release_key: str) -> None:
     with connect() as conn:
         conn.execute(

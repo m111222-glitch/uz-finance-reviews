@@ -215,6 +215,11 @@ def sync_all(
         except Exception as exc:
             stats["errors"].append(f"telegram-releases: {exc}")
 
+        try:
+            stats["telegram_release_month"] = releases.maybe_post_month_summary()
+        except Exception as exc:
+            stats["errors"].append(f"telegram-release-month: {exc}")
+
         db.finish_sync_run(run_id, status="ok", stats=stats)
         stats["run_id"] = run_id
         stats["status"] = "ok"

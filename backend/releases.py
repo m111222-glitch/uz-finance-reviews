@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from backend import db, notify
@@ -185,3 +185,162 @@ def post_new_releases(*, dry_run: bool = False) -> dict[str, Any]:
     if dry_run:
         stats["previews"] = previews
     return stats
+
+
+# ---- Monthly recap: who shipped how often, and how releases were received
+
+MONTH_STORES = ("ios", "play")  # Huawei/GetApps mirror Play builds late
+HIGHLIGHT_SLUG = "alif-mobi"
+TOP_FREQUENT = 3
+TOP_COMPLAINTS = 5
+RU_MONTHS_PREP = (
+    "январе", "феврале", "марте", "апреле", "мае", "июне",
+    "июле", "августе", "сентябре", "октябре", "ноябре", "декабре",
+)
+
+
+def _dt(value: str) -> datetime:
+    d = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def _month_range(year: int, month: int) -> tuple[datetime, datetime]:
+    start = datetime(year, month, 1, tzinfo=notify.TASHKENT)
+    end = datetime(year + (month == 12), month % 12 + 1, 1, tzinfo=notify.TASHKENT)
+    return start, end
+
+
+def month_stats(year: int, month: int) -> list[dict[str, Any]]:
+    """Per app and store: builds released that month, average gap, 1–2★ on them.
+
+    Stores are counted apart because iOS and Play version numbers often differ.
+    The gap includes the step from the previous month's last build.
+    """
+    start, end = _month_range(year, month)
+    catalog = db.load_catalog()
+    full = {a["slug"] for a in catalog["apps"]}
+    out = []
+    for app in catalog["apps"] + (catalog.get("release_only_apps") or []):
+        slug = app["slug"]
+        row: dict[str, Any] = {"slug": slug, "name": app["name"], "full": slug in full}
+        negatives = 0
+        rated = 0
+        for store in MONTH_STORES:
+            builds = db.store_releases(slug, store)
+            idx = [i for i, b in enumerate(builds) if start <= _dt(b["released_at"]) < end]
+            gaps = [
+                (_dt(builds[i]["released_at"]) - _dt(builds[i - 1]["released_at"])).total_seconds() / 86400
+                for i in idx
+                if i > 0
+            ]
+            neg = 0
+            for i in idx:
+                version = builds[i]["version"]
+                if slug in full and version:
+                    neg += db.negative_reviews_on_version(slug, store, version)
+                    rated += 1
+            negatives += neg
+            row[store] = {
+                "n": len(idx),
+                "gap": sum(gaps) / len(gaps) if gaps else None,
+                "neg": neg,
+            }
+        row["negatives"] = negatives
+        row["neg_per_release"] = negatives / rated if rated else None
+        out.append(row)
+    return out
+
+
+def _days(gap: float | None) -> str:
+    if gap is None:
+        return ""
+    d = max(1, round(gap))
+    if d == 1:
+        return "каждый день"
+    return f"раз в {d} {notify._ru_plural(d, 'день', 'дня', 'дней')}"
+
+
+def _store_part(store: str, s: dict[str, Any]) -> str:
+    icon = STORE_NAMES[store].split(" ", 1)[0]
+    n = s["n"]
+    text = f"{icon} {n} {notify._ru_plural(n, 'релиз', 'релиза', 'релизов')}"
+    return text + (f" ({_days(s['gap'])})" if n and s["gap"] is not None else "")
+
+
+def _decimal(x: float) -> str:
+    return f"{x:.1f}".replace(".", ",")
+
+
+def format_month_summary(year: int, month: int, stats: list[dict[str, Any]]) -> str:
+    esc = notify._esc
+    lines = [
+        f"📅 <b>Итоги {notify.RU_MONTHS[month - 1]} {year}</b>",
+        "Релизы в App Store и Google Play",
+        "",
+    ]
+
+    frequent = sorted(
+        (r for r in stats if r["ios"]["n"] or r["play"]["n"]),
+        key=lambda r: (-max(r["ios"]["n"], r["play"]["n"]), -(r["ios"]["n"] + r["play"]["n"])),
+    )[:TOP_FREQUENT]
+    if frequent:
+        lines.append("🏃 <b>Чаще всех выпускались</b>")
+        for r in frequent:
+            parts = " · ".join(_store_part(st, r[st]) for st in MONTH_STORES if r[st]["n"])
+            lines.append(f"• {notify.app_emoji(r['slug'])}{esc(r['name'])} — {parts}")
+        lines.append("")
+
+    hl = next((r for r in stats if r["slug"] == HIGHLIGHT_SLUG), None)
+    if hl:
+        parts = " · ".join(_store_part(st, hl[st]) for st in MONTH_STORES)
+        lines += [f"🔷 {notify.app_emoji(hl['slug'])}<b>{esc(hl['name'])}</b> — {parts}", ""]
+
+    complained = sorted(
+        (r for r in stats if r["neg_per_release"]),
+        key=lambda r: -r["neg_per_release"],
+    )[:TOP_COMPLAINTS]
+    if complained:
+        lines.append("😠 <b>Больше всего жалоб на релиз</b>")
+        lines.append("<i>отзывы на 1–2★, оставленные на новой версии</i>")
+        for r in complained:
+            lines.append(
+                f"• {notify.app_emoji(r['slug'])}{esc(r['name'])} — {_decimal(r['neg_per_release'])}"
+            )
+        total = sum(r["negatives"] for r in complained)
+        play = sum(r["play"]["neg"] for r in complained)
+        if total and play / total >= 0.7:
+            lines.append(
+                f"{round(100 * play / total)}% этих жалоб — из Google Play: там отзывов в разы больше."
+            )
+        lines.append("")
+
+    silent = [r["name"] for r in stats if not r["ios"]["n"] and not r["play"]["n"]]
+    if silent:
+        lines.append(f"🔕 <b>Без релизов в {RU_MONTHS_PREP[month - 1]}</b>")
+        lines.append(esc(", ".join(silent)))
+        lines.append("")
+
+    lines.append("#итоги_месяца")
+    return "\n".join(lines).strip()
+
+
+def maybe_post_month_summary(*, dry_run: bool = False) -> dict[str, Any]:
+    """Once per month, after the 1st: last month's release recap."""
+    today = datetime.now(notify.TASHKENT).date()
+    last = today.replace(day=1) - timedelta(days=1)
+    key = f"releases-{last.year}-{last.month:02d}"
+    out: dict[str, Any] = {"month": key, "posted": False, "skipped": False}
+    start, _ = _month_range(last.year, last.month)
+    seen = db.earliest_release_seen()
+    # Tracking must have started by the month's first days, or counts are partial
+    if not seen or _dt(seen) > start + timedelta(days=3) or db.summary_posted(key):
+        out["skipped"] = True
+        return out
+    stats = month_stats(last.year, last.month)
+    out["preview"] = format_month_summary(last.year, last.month, stats)
+    if dry_run or not enabled():
+        return out
+    notify.send_message(out["preview"], chat_id=chat_id())
+    db.mark_summary_posted(key, {s["slug"]: [s["ios"]["n"], s["play"]["n"]] for s in stats})
+    out["posted"] = True
+    return out
