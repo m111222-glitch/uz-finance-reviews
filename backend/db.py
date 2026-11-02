@@ -119,6 +119,14 @@ def init_db() -> None:
                 FOREIGN KEY (review_id) REFERENCES reviews(id)
             );
 
+            -- Copies of main-channel posts sent to an app's own channel (catalog telegram_channels)
+            CREATE TABLE IF NOT EXISTS telegram_channel_posts (
+                review_id TEXT NOT NULL,
+                chat_id TEXT NOT NULL,
+                posted_at TEXT NOT NULL,
+                PRIMARY KEY (review_id, chat_id)
+            );
+
             CREATE TABLE IF NOT EXISTS telegram_summaries (
                 day TEXT PRIMARY KEY,
                 posted_at TEXT NOT NULL,
@@ -707,6 +715,38 @@ def mark_telegram_posted(review_id: str, rating: int | None, *, status: str = "p
             VALUES (?, ?, ?, ?)
             """,
             (review_id, rating, utcnow(), status),
+        )
+
+
+def channel_backlog(chat_id: str, slugs: list[str], *, since_iso: str) -> list[dict[str, Any]]:
+    """Reviews already posted to the main channel that `chat_id` hasn't received, oldest first.
+
+    Driven by the main channel's posts, so a channel that was unreachable for a
+    while catches up on its next run instead of losing those reviews.
+    """
+    placeholders = ",".join("?" * len(slugs))
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT r.*, a.name AS app_name, a.brand
+            FROM telegram_posts t
+            JOIN reviews r ON r.id = t.review_id
+            JOIN apps a ON a.slug = r.app_slug
+            LEFT JOIN telegram_channel_posts c ON c.review_id = r.id AND c.chat_id = ?
+            WHERE t.status = 'posted' AND c.review_id IS NULL
+              AND r.app_slug IN ({placeholders}) AND t.posted_at >= ?
+            ORDER BY t.posted_at
+            """,
+            [chat_id, *slugs, since_iso],
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_channel_posted(review_id: str, chat_id: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO telegram_channel_posts (review_id, chat_id, posted_at) VALUES (?, ?, ?)",
+            (review_id, chat_id, utcnow()),
         )
 
 

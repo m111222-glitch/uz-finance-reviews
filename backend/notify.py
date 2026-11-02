@@ -279,6 +279,39 @@ def device_summary(review: dict[str, Any]) -> str:
 
 
 @lru_cache(maxsize=1)
+def app_channels() -> dict[str, list[str]]:
+    """Apps' own Telegram channels from the catalog's `telegram_channels`: chat id -> app slugs."""
+    out: dict[str, list[str]] = {}
+    for a in db.load_catalog()["apps"]:
+        for chat in a.get("telegram_channels") or []:
+            out.setdefault(chat, []).append(a["slug"])
+    return out
+
+
+def post_to_app_channels(*, dry_run: bool = False) -> dict[str, Any]:
+    """Copy main-channel posts of apps with their own channel (e.g. Alif Mobi -> @alifreviews)."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=_lookback_hours())).isoformat()
+    out: dict[str, Any] = {}
+    for chat, slugs in app_channels().items():
+        stats = out[chat] = {"pending": 0, "posted": 0, "error": None}
+        rows = db.channel_backlog(chat, slugs, since_iso=since)
+        stats["pending"] = len(rows)
+        if dry_run:
+            continue
+        for review in rows:
+            try:
+                send_message(format_message(review), chat_id=chat)
+            except Exception as exc:
+                # Usually the bot lacking post rights; the rest waits for the next run
+                stats["error"] = _redact(str(exc))
+                break
+            db.mark_channel_posted(review["id"], chat)
+            stats["posted"] += 1
+            time.sleep(3.1)  # Telegram allows ~20 msgs/min to one chat
+    return out
+
+
+@lru_cache(maxsize=1)
 def _app_emoji_map() -> dict[str, dict[str, str]]:
     return {a["slug"]: a["tg_emoji"] for a in db.load_catalog()["apps"] if a.get("tg_emoji")}
 
@@ -747,4 +780,8 @@ def notify_new_reviews(*, dry_run: bool = False) -> dict[str, Any]:
         stats["weekly_suspicion"] = maybe_post_weekly_suspicion(dry_run=dry_run)
     except Exception as exc:
         stats["weekly_suspicion"] = {"posted": False, "error": _redact(str(exc))}
+    try:
+        stats["app_channels"] = post_to_app_channels(dry_run=dry_run)
+    except Exception as exc:
+        stats["app_channels"] = {"error": _redact(str(exc))}
     return stats

@@ -15,7 +15,8 @@
         "developer_id": "8828065338941423741",
         "app_id": "4972306327806446195"
       },
-      "tg_emoji": {"id": "5253655686398629310", "emoji": "📱"}
+      "tg_emoji": {"id": "5253655686398629310", "emoji": "📱"},
+      "telegram_channels": ["@alifreviews"]
     },
     {
       "slug": "payme",
